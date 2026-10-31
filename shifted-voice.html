@@ -301,12 +301,16 @@ h1{font-size:30px;margin:0;letter-spacing:-.9px;font-weight:730}
  .card{flex:none;}
  .audio-area{height:110px;min-height:110px;flex:none;}
 }
+.round-actions{display:flex;flex-direction:column;align-items:flex-end;gap:6px;flex-shrink:0}
+.back-link{display:inline-flex;align-items:center;min-height:32px;color:#b2d9c8;font-size:11px;text-decoration:none;white-space:nowrap}
+.back-link:hover{text-decoration:underline}
+.back-link:focus-visible{outline:2px solid #d5f8e2;outline-offset:3px;border-radius:4px}
 </style>
 </head>
 <body>
 <main>
  <section class="card idle" id="card" aria-label="Определите изменённую ноту">
-  <div class="headrow"><div><h1>Какой голос изменился?</h1><p class="sub">Сначала созвучие, затем одна нота на полтона выше или ниже.</p></div><span class="round" id="round">Готово</span></div>
+  <div class="headrow"><div><h1>Какой голос изменился?</h1><p class="sub">Сначала созвучие, затем одна нота на полтона выше или ниже.</p></div><div class="round-actions"><a class="back-link" href="./index.html">← К упражнениям</a><span class="round" id="round">Готово</span></div></div>
   <div class="mode-row" aria-label="Режим звучания"><span class="mode-label">ЗВУЧАНИЕ</span><div class="mode-switch" role="group" aria-label="Выбор инструмента"><button type="button" id="electronicMode" class="mode-btn active" aria-pressed="true">Электронное</button><button type="button" id="pianoMode" class="mode-btn" aria-pressed="false">Пианино</button></div></div>
   <div class="audio-area"><div class="orb" id="orb"><button class="orb-start" id="start" type="button" aria-label="Начать тренировку"><span aria-hidden="true">▶</span><small>НАЧАТЬ</small></button><div class="bars" id="bars"><span class="bar"></span><span class="bar"></span><span class="bar"></span><span class="bar"></span><span class="bar"></span><span class="bar"></span></div><div class="feedback-icon" id="feedbackIcon"></div></div></div>
   <div class="prompt" aria-live="polite"><strong id="prompt">Определите, какая нота изменилась.</strong><small id="detail">Слушайте созвучие, затем одиночную ноту.</small></div>
