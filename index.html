@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#10141a">
+<meta name="description" content="Два бесплатных интерактивных упражнения для развития музыкального слуха.">
+<title>Тренажёры музыкального слуха</title>
+<style>
+  :root{color-scheme:dark;--bg:#10141a;--ink:#f1f4f6;--muted:#b4bec8;--accent:#b4dbca}
+  *,*::before,*::after{box-sizing:border-box}
+  html{min-height:100%;-webkit-text-size-adjust:100%}
+  body{min-height:100vh;min-height:100dvh;margin:0;padding:max(22px,env(safe-area-inset-top)) max(16px,env(safe-area-inset-right)) max(24px,env(safe-area-inset-bottom)) max(16px,env(safe-area-inset-left));font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif;color:var(--ink);background:radial-gradient(ellipse at 50% -20%,#25363a 0%,transparent 52%),var(--bg);display:grid;place-items:center}
+  main{width:min(100%,660px)}
+  header{margin:0 0 25px}
+  h1{font-size:clamp(27px,6.5vw,38px);line-height:1.16;letter-spacing:-.9px;margin:0 0 12px}
+  p{margin:0;line-height:1.55;color:var(--muted)}
+  .list{display:grid;gap:16px}
+  .exercise{background:linear-gradient(180deg,#1d2630,#171e26);border:1px solid #3c454d;border-radius:22px;padding:24px;display:flex;gap:16px;flex-direction:column}
+  .eyebrow{font-size:12px;letter-spacing:1.2px;text-transform:uppercase;color:var(--accent);font-weight:750}
+  h2{font-size:clamp(21px,5vw,26px);margin:8px 0 10px;letter-spacing:-.3px}
+  a.exercise-link{display:block;text-align:center;border-radius:14px;background:#b4dbca;color:#122822;text-decoration:none;font-size:17px;font-weight:750;padding:16px 20px;min-height:56px}
+  a.exercise-link:hover{background:#d4eee3}
+  a.exercise-link:focus-visible{outline:3px solid white;outline-offset:4px}
+  footer{margin-top:24px;text-align:center;color:#98aab5;font-size:13px}
+  @media(min-width:600px){.exercise{padding:28px}.list{gap:20px}}
+  @media(prefers-reduced-motion:reduce){*{scroll-behavior:auto}}
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>Тренажёры музыкального слуха</h1>
+    <p>Два упражнения для самостоятельной практики. Откройте нужное упражнение и нажмите «Начать», чтобы разрешить воспроизведение звука.</p>
+  </header>
+  <section class="list" aria-label="Список упражнений">
+    <article class="exercise">
+      <div>
+        <div class="eyebrow">Упражнение 1</div>
+        <h2>Сколько нот звучит?</h2>
+        <p>Послушайте созвучие и определите, сколько нот прозвучало одновременно: две, три или четыре.</p>
+      </div>
+      <a class="exercise-link" href="./count-notes.html">Открыть упражнение</a>
+    </article>
+    <article class="exercise">
+      <div>
+        <div class="eyebrow">Упражнение 2</div>
+        <h2>Какой голос изменился?</h2>
+        <p>Сначала звучит созвучие из двух или трёх голосов, затем один звук, изменённый на полтона. Определите голос и направление изменения.</p>
+      </div>
+      <a class="exercise-link" href="./shifted-voice.html">Открыть упражнение</a>
+    </article>
+  </section>
+  <footer>Работает на телефоне и компьютере. Музыкальные звуки воспроизводятся непосредственно в браузере.</footer>
+</main>
+</body>
+</html>
