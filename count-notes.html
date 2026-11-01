@@ -22,11 +22,15 @@ h1{font-size:30px;margin:0;letter-spacing:-.9px;font-weight:730}
 .sub{color:var(--muted);margin:9px 0 0;font-size:14px;line-height:1.6}
 .round{border:1px solid #364149;border-radius:100px;color:#b2bec5;padding:8px 13px;font-size:12px;white-space:nowrap}
 .audio-area{height:218px;display:flex;align-items:center;justify-content:center;position:relative}
-.orb{width:154px;height:154px;border:1px solid #46575c;border-radius:50%;background:radial-gradient(circle at 44% 38%,#32494d,#1e3036 65%,#18252c);display:grid;place-items:center;box-shadow:inset 0 0 35px #101c2455,0 12px 42px #0005;transition:box-shadow .12s, border-color .12s, background .12s}
+.orb{position:relative;width:154px;height:154px;border:1px solid #46575c;border-radius:50%;background:radial-gradient(circle at 44% 38%,#32494d,#1e3036 65%,#18252c);display:grid;place-items:center;box-shadow:inset 0 0 35px #101c2455,0 12px 42px #0005;transition:box-shadow .12s, border-color .12s, background .12s}
 .orb.playing{box-shadow:0 0 0 8px #8cd5c60c,0 0 0 19px #8cd5c608,inset 0 0 28px #79ccb51c}
 .good .orb{border-color:#58d99b;background:radial-gradient(circle,#236344,#173a30)}
 .bad .orb{border-color:#fa7979;background:radial-gradient(circle,#813c44,#48262d)}
 .bars{height:64px;display:flex;gap:6px;align-items:center;justify-content:center}
+.note-name{position:absolute;inset:0;display:none;align-items:center;justify-content:center;text-align:center;padding:12px;font-size:clamp(26px,8vw,38px);font-weight:750;line-height:1.1;color:#eafff6;letter-spacing:.4px;text-shadow:0 2px 18px #0008;pointer-events:none}
+.note-name.chord{font-size:clamp(15px,4.6vw,22px);line-height:1.25;letter-spacing:.1px}
+.orb.show-note .note-name{display:flex}
+.orb.show-note .bars,.orb.show-note .feedback-icon{display:none}
 .bar{height:22px;width:6px;border-radius:99px;background:var(--accent);transition:height .13s ease,background .13s ease;opacity:.88}
 .orb.playing .bar:nth-child(1){animation:equalize .48s ease-in-out infinite alternate}
 .orb.playing .bar:nth-child(2){animation:equalize .67s ease-in-out -.15s infinite alternate}
@@ -236,7 +240,7 @@ h1{font-size:30px;margin:0;letter-spacing:-.9px;font-weight:730}
  <section class="card idle" id="card" aria-label="Сколько нот?">
   <div class="headrow"><div><h1>Сколько нот?</h1><p class="sub">Сколько разных нот звучит одновременно?</p></div><div class="round-actions"><a class="back-link" href="./index.html">← К упражнениям</a><span class="round" id="round">Готово</span></div></div>
   <div class="mode-row" aria-label="Режим звучания"><span class="mode-label">ЗВУЧАНИЕ</span><div class="mode-switch" role="group" aria-label="Выбор инструмента"><button type="button" id="electronicMode" class="mode-btn active" aria-pressed="true">Электронное</button><button type="button" id="pianoMode" class="mode-btn" aria-pressed="false">Пианино</button></div></div>
-  <div class="audio-area"><div class="orb" id="orb"><button class="orb-start" id="start" type="button" aria-label="Начать тренировку"><span aria-hidden="true">▶</span><small>НАЧАТЬ</small></button><div class="bars" id="bars"><span class="bar"></span><span class="bar"></span><span class="bar"></span><span class="bar"></span><span class="bar"></span><span class="bar"></span></div><div class="feedback-icon" id="feedbackIcon"></div></div></div>
+  <div class="audio-area"><div class="orb" id="orb"><button class="orb-start" id="start" type="button" aria-label="Начать тренировку"><span aria-hidden="true">▶</span><small>НАЧАТЬ</small></button><div class="bars" id="bars"><span class="bar"></span><span class="bar"></span><span class="bar"></span><span class="bar"></span><span class="bar"></span><span class="bar"></span></div><div class="note-name" id="noteName" aria-live="polite"></div><div class="feedback-icon" id="feedbackIcon"></div></div></div>
   <div class="prompt" aria-live="polite"><strong id="prompt">Слушайте и отвечайте интуитивно.</strong><small id="detail">Нажмите 2, 3 или 4 на клавиатуре.</small></div>
   <div class="answers" aria-label="Количество нот">
    <button class="choice" id="answer2" data-guess="2" disabled>2<small>НОТЫ</small></button>
@@ -469,6 +473,8 @@ function audio(){
  if(ctx.state==='suspended') ctx.resume();
 }
 const hz = midi => 440*Math.pow(2,(midi-69)/12);
+const NOTE_NAMES_RU = ['до','до-диез','ре','ре-диез','ми','фа','фа-диез','соль','соль-диез','ля','ля-диез','си'];
+const noteName = midi => NOTE_NAMES_RU[((midi%12)+12)%12];
 function tone(frequency, start, duration, amplitude=.16, type='sine', overtones=true, exercise=false){
  const harmonics=overtones ? [[1,1],[2,.16],[3,.05]] : [[1,1]];
  for (const [multiple,weight] of harmonics) {
@@ -601,7 +607,8 @@ function burstConfetti(){
 }
 function clearFeedback(){
  clearConfetti();
- $('card').classList.remove('good','bad');$('orb').classList.remove('playing');
+ $('card').classList.remove('good','bad');$('orb').classList.remove('playing','show-note');
+ $('noteName').textContent='';$('noteName').classList.remove('chord');
  $('feedbackIcon').textContent=''; buttons.forEach(b=>{b.classList.remove('correct','incorrect');});
 }
 function next(){
@@ -644,15 +651,21 @@ function mark(guess){
 function scheduleExplanation(firstNoteAt){
  const answer=current.length;
  current.forEach((note,i)=>schedule(()=>{
+  const name=noteName(note);
+  $('noteName').textContent=name;$('noteName').classList.remove('chord');
+  $('orb').classList.add('show-note');
   playIsolatedNote(note,ctx.currentTime+.01,NOTE_MS/1000);
   $('orb').classList.add('playing');
   $('detail').textContent=`Нота ${i+1} из ${answer}`;
-  schedule(()=>$('orb').classList.remove('playing'),NOTE_MS);
+  schedule(()=>$('orb').classList.remove('playing','show-note'),NOTE_MS);
  },firstNoteAt+i*(NOTE_MS+NOTE_GAP_MS)));
  const togetherAt = firstNoteAt+current.length*(NOTE_MS+NOTE_GAP_MS)+500;
  schedule(()=>{
   $('detail').textContent='Теперь все ноты вместе.';
+  $('noteName').textContent=current.map(noteName).join(' · ');$('noteName').classList.add('chord');
+  $('orb').classList.add('show-note');
   playChord(current,CHORD_MS/1000);
+  schedule(()=>$('orb').classList.remove('show-note'),CHORD_MS);
  },togetherAt);
  scheduleReviewAdvance(togetherAt+CHORD_MS+TEST_GAP_MS);
 }
@@ -662,7 +675,8 @@ function repeatExplanation(){
  // Let any sounding note finish, then keep the usual one-second silence.
  const waitMs=Math.max(TEST_GAP_MS,exerciseSoundUntilMs-performance.now()+TEST_GAP_MS);
  $('detail').textContent='Повторяем разбор…';
- $('orb').classList.remove('playing');
+ $('orb').classList.remove('playing','show-note');
+ $('noteName').textContent='';$('noteName').classList.remove('chord');
  scheduleExplanation(waitMs);
 }
 async function begin(){
