@@ -4,12 +4,12 @@
     "count-notes.html": {
       "original": "count_the_notes_trainer_ru_v7.html",
       "sha256_original": "219b87910a82ccba8ce6b571079e973a81e7e61740a26c424904e3749c5ba686",
-      "sha256_packaged": "308e70dda53635868c13f20d8b0706ecc7249d780f1c5d356e939c0aebd66600"
+      "sha256_packaged": "d85c2c6c1b958ac69117de123ea62892e68b406e23d2b07b45170eb6a913c13d"
     },
     "shifted-voice.html": {
       "original": "which_voice_shifted_ru_v8.html",
       "sha256_original": "25099db8c7bd581b324b2119b92d60860527d2cee15b6898be04659d6021510c",
-      "sha256_packaged": "e456206aff09c2721488a770869e0e5c81eec5ae4e2b8321dadb180ed5448b36"
+      "sha256_packaged": "d17dfb3778892cb0be490bf2e4fe60352a8d58ce293810b5ecc0ad234c6907e5"
     }
   }
 }
