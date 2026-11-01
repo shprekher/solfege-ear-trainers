@@ -1,18 +1,19 @@
 # Тренажёры музыкального слуха
 
-Два самостоятельных интерактивных упражнения на русском языке для телефона и компьютера.
+Три самостоятельных интерактивных упражнения на русском языке для телефона и компьютера.
 
 ## Состав сайта
 
 | Файл | Назначение | Основа |
 |---|---|---|
 | `index.html` | Стартовая страница и ссылки на упражнения | Новая оболочка, не меняет упражнения |
+| `half-step.html` | «Выше или ниже?» — второй звук на полтона выше или ниже первого | Новое упражнение в общей оболочке |
 | `count-notes.html` | «Сколько нот?» — определение 2/3/4 одновременных нот | `count_the_notes_trainer_ru_v7.html` |
 | `shifted-voice.html` | «Какой голос изменился?» — 2/3 голоса, изменение одного звука на ±1 полутон | `which_voice_shifted_ru_v8.html` |
 | `AGENTS.md` | Постоянные инструкции OpenCode | — |
 | `OPENCODE_TASK.md` | Готовое задание агенту на публикацию | — |
 | `DEPLOY.md` | Публикация в GitHub и на российском хостинге | — |
-| `THIRD_PARTY_LICENSES.md` | Сведения о встроенных звуках пианино | — |
+| `THIRD_PARTY_LICENSES.md` | Сведения о встроенных звуках пианино и электропиано | — |
 
 ## Быстрый запуск
 
@@ -41,6 +42,7 @@ python3 -m http.server 8000
 
 - Исходники: https://github.com/shprekher/solfege-ear-trainers
 - Главная: https://solfege-ear-trainers.tuqo.ru/
+- «Выше или ниже?»: https://solfege-ear-trainers.tuqo.ru/half-step.html
 - «Сколько нот?»: https://solfege-ear-trainers.tuqo.ru/count-notes.html
 - «Какой голос изменился?»: https://solfege-ear-trainers.tuqo.ru/shifted-voice.html
 
