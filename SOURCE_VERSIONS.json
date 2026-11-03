@@ -1,6 +1,11 @@
 {
   "project": "Тренажёры музыкального слуха",
   "exercise_sources": {
+    "note-names.html": {
+      "original": "new exercise created for this project",
+      "sha256_original": null,
+      "sha256_packaged": "145ce41f681661fd6b2b2099dd2e84e404bad99d5bba04a7cf6d566b7d310f70"
+    },
     "half-step.html": {
       "original": "new exercise created for this project",
       "sha256_original": null,
