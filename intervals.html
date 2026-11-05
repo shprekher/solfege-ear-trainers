@@ -15,10 +15,12 @@ main{width:min(100%,600px);position:relative}.card{position:relative;overflow:hi
 @media(max-width:530px){html{height:100%}body{height:100svh;min-height:100svh;padding:max(11px,env(safe-area-inset-top)) 12px max(11px,env(safe-area-inset-bottom));align-items:flex-start}main{height:100%;display:flex;flex-direction:column}.card{flex:1 1 auto;min-height:0;padding:22px 19px 19px;border-radius:24px;display:flex;flex-direction:column}h1{font-size:26px}.sub{font-size:13px;line-height:1.4;margin-top:6px}.round{padding:7px 10px;font-size:11px}.mode-row{margin-top:16px;gap:7px;flex-shrink:0}.mode-btn{min-width:96px;padding:9px 10px}.audio-area{height:auto;min-height:140px;flex:1 1 auto}.orb{height:clamp(120px,18svh,186px);width:clamp(120px,18svh,186px)}.prompt{min-height:45px}.answers{margin-top:14px;gap:10px;flex-shrink:0}.choice{min-height:clamp(78px,11svh,112px);font-size:23px}.footrow{margin-top:12px}.replay-control{min-height:56px}.progress{margin-top:13px}.metrics{margin-top:10px;padding:10px 4px}.metric b{font-size:21px}.bottom{margin-top:10px}.feedback{margin-top:6px}}
 @media(max-width:530px) and (max-height:680px){.card{padding:13px 14px}.sub{display:none}.mode-row{margin-top:9px}.audio-area{min-height:108px}.orb{width:110px;height:110px}.choice{min-height:72px;font-size:21px}.answers{margin-top:8px}.footrow{margin-top:7px}.replay-control{min-height:46px}.progress{margin-top:8px}.metrics{margin-top:7px;padding:7px 4px}.bottom{margin-top:6px}.explanation{font-size:11px}}
 @media(max-width:530px){.metric{padding:0 1px}.metric span{font-size:clamp(8px,2.2vw,10px);margin-top:5px}}
+@media(max-width:530px){.mode-row .mode-btn{min-width:0;padding:9px 5px;font-size:10px}.mode-row .mode-switch{gap:2px;flex-shrink:0}}
+@media(max-width:360px){.mode-row{gap:3px}.mode-row .mode-btn{padding:9px 3px;font-size:9px}}
 @media(prefers-reduced-motion:reduce){.orb.playing .bar{animation:none}.choice{transition:none}}
 </style></head><body><main><section class="card idle" id="card" aria-label="Какой интервал?">
 <div class="headrow"><div><h1>Какой интервал?</h1><p class="sub">Определите на слух малую или большую секунду, малую или большую терцию.</p></div><div class="round-actions"><a class="back-link" href="./index.html">← К упражнениям</a><span class="round" id="round">Готово</span></div></div>
-<div class="mode-row"><span class="mode-label">ЗВУЧАНИЕ</span><div class="mode-switch" role="group" aria-label="Выбор инструмента"><button type="button" id="electric" class="mode-btn" aria-pressed="false">Электронное</button><button type="button" id="piano" class="mode-btn active" aria-pressed="true">Пианино</button></div></div>
+<div class="mode-row"><div class="mode-switch" role="group" aria-label="Тип интервала"><button type="button" id="melodic" class="mode-btn active" aria-pressed="true">Мелодический</button><button type="button" id="harmonic" class="mode-btn" aria-pressed="false">Гармонический</button></div><div class="mode-switch" role="group" aria-label="Выбор инструмента"><button type="button" id="electric" class="mode-btn" aria-pressed="false">Электронное</button><button type="button" id="piano" class="mode-btn active" aria-pressed="true">Пианино</button></div></div>
 <div class="audio-area"><div class="orb" id="orb"><button type="button" id="start" class="orb-start" aria-label="Начать тренировку"><span aria-hidden="true">▶</span><small>НАЧАТЬ</small></button><div class="bars"><span class="bar"></span><span class="bar"></span><span class="bar"></span><span class="bar"></span><span class="bar"></span><span class="bar"></span></div><div class="feedback-icon" id="feedbackIcon"></div></div></div>
 <div class="prompt" aria-live="polite"><strong id="prompt">Слушайте два звука.</strong><small id="hint">Первый звук, затем второй.</small></div>
 <div class="answers" aria-label="Какой интервал звучит?"><button class="choice" data-interval="1" disabled>м.2<small>Малая секунда</small></button><button class="choice" data-interval="2" disabled>б.2<small>Большая секунда</small></button><button class="choice" data-interval="3" disabled>м.3<small>Малая терция</small></button><button class="choice" data-interval="4" disabled>б.3<small>Большая терция</small></button></div>
@@ -96,6 +98,7 @@ const ELECTRONIC_MP3 = {
 const names={1:'малая секунда',2:'большая секунда',3:'малая терция',4:'большая терция'};
 const $=id=>document.getElementById(id),buttons=[...document.querySelectorAll('[data-interval]')];
 let ctx=null,limiter=null,timbre='piano',round=null,state='idle',transition=null,played=0,correct=0,streak=0,record=0,prev=null;
+let intervalType='melodic';
 let busyUntil=-Infinity,playTimer=null,endTimer=null,loading=false,modeRequest=0;
 const buffers={piano:new Map(),electric:new Map()},loads={piano:null,electric:null};
 try{record=Number(localStorage.getItem('intervals-record')||0)||0}catch{}
@@ -121,13 +124,13 @@ function ensureBank(mode){
  })).then(entries=>{buffers[mode]=new Map(entries)}).catch(error=>{loads[mode]=null;throw error});
  return loads[mode];
 }
-function note(midi,start,duration){
+function note(midi,start,duration,volume=1.15){
  const base=Math.max(48,Math.min(78,midi)),buffer=buffers[timbre].get(base);
  if(!buffer)throw new Error('Отсутствует звуковой сэмпл');
  const source=ctx.createBufferSource(),gain=ctx.createGain(),fade=Math.min(.05,duration*.17);
  source.buffer=buffer;source.playbackRate.setValueAtTime(Math.pow(2,(midi-base)/12),start);
- gain.gain.setValueAtTime(.0001,start);gain.gain.linearRampToValueAtTime(1.15,start+.006);
- gain.gain.setValueAtTime(1.15,start+Math.max(.007,duration-fade));gain.gain.linearRampToValueAtTime(.0001,start+duration);
+ gain.gain.setValueAtTime(.0001,start);gain.gain.linearRampToValueAtTime(volume,start+.006);
+ gain.gain.setValueAtTime(volume,start+Math.max(.007,duration-fade));gain.gain.linearRampToValueAtTime(.0001,start+duration);
  source.connect(gain);gain.connect(limiter);source.start(start);source.stop(start+duration+.005);
  source.onended=()=>{source.disconnect();gain.disconnect()};
 }
@@ -141,15 +144,18 @@ function scheduleAdvance(delay){cancelTransition();transition=setTimeout(()=>{tr
 function play(slow=false){
  if(!round||(state!=='question'&&state!=='review'))return;
  clearPlaybackTimers();
- const wait=Math.max(0,busyUntil-performance.now()),gap=slow?.83:.62,d1=slow?.67:.53,d2=slow?.78:.7;
- const duration=gap+d2;
+ const harmonic=intervalType==='harmonic';
+ const wait=Math.max(0,busyUntil-performance.now()),gap=harmonic?0:(slow?.83:.62),d1=harmonic?(slow?1.5:1.35):(slow?.67:.53),d2=harmonic?d1:(slow?.78:.7);
+ const duration=Math.max(d1,gap+d2);
  if(state==='review')scheduleAdvance(Math.max(4600,wait+duration*1000+1000));
  playTimer=setTimeout(()=>{
   playTimer=null;
   if(!round||loading||(state!=='question'&&state!=='review')){refreshControls();return}
   try{
    const t=ctx.currentTime+.035;
-   note(round.first,t,d1);note(round.second,t+gap,d2);
+   // Match the other exercises' per-note level when two notes sound together.
+   const volume=harmonic?1.15/2:1.15;
+   note(round.first,t,d1,volume);note(round.second,t+gap,d2,volume);
    busyUntil=performance.now()+35+duration*1000;
    $('orb').classList.add('playing');
    endTimer=setTimeout(()=>{endTimer=null;$('orb').classList.remove('playing');refreshControls()},35+duration*1000);
@@ -159,7 +165,10 @@ function play(slow=false){
 }
 function next(){
  cancelTransition();clearPlaybackTimers();round=generate();state='question';clearFeedback();$('card').classList.remove('idle');
- $('repeatLabel').textContent='Повторить вопрос';setStatus('Какой интервал звучит?','Послушайте два звука и выберите один ответ.');play();
+ $('repeatLabel').textContent='Повторить вопрос';setStatus('Какой интервал звучит?',intervalType==='harmonic'?'Послушайте два одновременных звука и выберите ответ.':'Послушайте два звука и выберите один ответ.');play();
+}
+function updateExplanation(){
+ $('explanation').textContent='Расстояние между звуками — '+round.distance+' '+(round.distance===1?'полутон':'полутона')+'. '+(intervalType==='harmonic'?'Звуки звучат одновременно.':'Второй звук '+(round.dir>0?'выше':'ниже')+' первого.')+' Нажмите «Повторить объяснение», чтобы услышать их ещё раз.';
 }
 function answer(distance){
  if(state!=='question'||loading||playTimer!==null||endTimer!==null)return;
@@ -169,10 +178,19 @@ function answer(distance){
  if(!ok)buttons.find(b=>Number(b.dataset.interval)===distance).classList.add('wrong');
  $('feedback').textContent=ok?'Верно!':'Не совсем. Правильный ответ: '+names[round.distance]+'.';$('feedback').className='feedback '+(ok?'good':'bad');
  $('card').classList.add(ok?'good':'bad');$('feedbackIcon').textContent=ok?'✓':'×';
- $('explanation').textContent='Расстояние между звуками — '+round.distance+' '+(round.distance===1?'полутон':'полутона')+'. Второй звук '+(round.dir>0?'выше':'ниже')+' первого. Нажмите «Повторить объяснение», чтобы услышать их ещё раз.';
+ updateExplanation();
  $('repeatLabel').textContent='Повторить объяснение';setStatus(ok?'Интервал определён':'Разберём интервал','Следующее задание начнётся автоматически.');
  if(ok){$('prompt').classList.remove('celebrate');void $('prompt').offsetWidth;$('prompt').classList.add('celebrate')}
  scheduleAdvance(4600);refreshControls();
+}
+function selectIntervalType(type){
+ if(type===intervalType)return;
+ intervalType=type;
+ for(const name of ['melodic','harmonic']){$(name).setAttribute('aria-pressed',String(name===type));$(name).classList.toggle('active',name===type)}
+ if(state==='idle')$('hint').textContent=type==='harmonic'?'Два звука одновременно.':'Первый звук, затем второй.';
+ if(state==='question')$('hint').textContent=type==='harmonic'?'Послушайте два одновременных звука и выберите ответ.':'Послушайте два звука и выберите один ответ.';
+ if(state==='review')updateExplanation();
+ if(!loading&&(state==='question'||state==='review'))play(state==='review');
 }
 async function begin(){
  if(state!=='idle'||loading)return;
@@ -199,6 +217,7 @@ $('start').addEventListener('click',begin);
 $('repeat').addEventListener('click',()=>{if(!loading&&playTimer===null&&endTimer===null){if(state==='question')play();else if(state==='review')play(true)}});
 buttons.forEach(b=>b.addEventListener('click',()=>answer(Number(b.dataset.interval))));
 for(const mode of ['piano','electric'])$(mode).addEventListener('click',()=>selectMode(mode));
+for(const type of ['melodic','harmonic'])$(type).addEventListener('click',()=>selectIntervalType(type));
 document.addEventListener('keydown',e=>{if(e.repeat||e.altKey||e.metaKey||e.ctrlKey||/INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName))return;if(state==='question'&&/^[1-4]$/.test(e.key))answer(Number(e.key));else if(e.code==='Space'&&state!=='idle'&&document.activeElement.tagName!=='BUTTON'){e.preventDefault();$('repeat').click()}});
 })();
 </script></body>
