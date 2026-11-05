@@ -47,6 +47,11 @@
         await wait(() => $('answers').textContent === '70');
         assert((await store.list()).length === 70, 'UI-импорт не восстановил данные');
         results.push({ title: 'Экспорт, подтверждение удаления и импорт через интерфейс', ok: true });
+        await store.append({ ...records[0], id: 'exercise6', exercise: 'intervals-extended', task: '9:down', expected: 'большая секста', actual: 'чистая кварта', correct: false });
+        doc.dispatchEvent(new win.Event('visibilitychange')); await wait(() => $('answers').textContent === '71');
+        $('exercise').value = 'intervals-extended'; $('exercise').dispatchEvent(new win.Event('change'));
+        assert($('level').textContent === '0%' && $('errors').textContent.includes('Большая секста ↓'), 'Нет отдельной статистики упражнения 6');
+        results.push({ title: 'Отдельный прогресс упражнения 6 и подписи секст', ok: true });
       }
     } catch (error) { results.push({ title: 'Страница, ширина ' + width, ok: false, error: error.message }); }
     finally { await win.SolfegeProgress.store.close(); frame.remove(); }

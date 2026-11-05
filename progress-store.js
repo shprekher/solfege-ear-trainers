@@ -8,7 +8,8 @@
     'shifted-voice': '2 · Какой голос изменился?',
     'note-names': '3 · Русские и английские ноты',
     'note-reading': '4 · Чтение нот',
-    intervals: '5 · Какой интервал?'
+    intervals: '5 · Какой интервал?',
+    'intervals-extended': '6 · Кварта, квинта и сексты'
   });
   const own = (o, key) => Object.prototype.hasOwnProperty.call(o, key);
   const dayKey = (date = new Date()) => [date.getFullYear(), String(date.getMonth() + 1).padStart(2, '0'), String(date.getDate()).padStart(2, '0')].join('-');

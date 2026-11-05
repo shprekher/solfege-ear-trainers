@@ -40,7 +40,7 @@
       if (exercise === 'shifted-voice') { doc.querySelector('[data-voice="' + correctData.voice + '"]').click(); doc.querySelector('[data-direction="' + correctData.direction + '"]').click(); }
       else if (exercise === 'half-step') doc.querySelector('[data-direction="' + correctData.direction + '"]').click();
       else if (exercise === 'count-notes') doc.querySelector('[data-guess="' + correctData.guess + '"]').click();
-      else if (exercise === 'intervals') doc.querySelector('[data-interval="' + correctData.interval + '"]').click();
+      else if (exercise === 'intervals' || exercise === 'intervals-extended') doc.querySelector('[data-interval="' + correctData.interval + '"]').click();
       else doc.querySelector('[data-letter="' + correctData.letter + '"]').click();
       await wait(async () => (await store.list()).filter(a => a.exercise === exercise).length === 2);
       const rows = (await store.list()).filter(a => a.exercise === exercise);
@@ -53,7 +53,7 @@
   }));
   await store.close();
   const total = (await store.list()).length;
-  results.push({ exercise: 'Повторное открытие базы: 12 ответов', ok: total === 12, total });
+  results.push({ exercise: 'Повторное открытие базы: ' + files.length * 2 + ' ответов', ok: total === files.length * 2, total });
   await store.close();
   await new Promise(resolve => { const request = indexedDB.deleteDatabase(name); request.onsuccess = resolve; request.onerror = resolve; });
   window.__progressIntegrationResults = results;

@@ -30,6 +30,11 @@
       "original": "which_voice_shifted_ru_v8.html",
       "sha256_original": "25099db8c7bd581b324b2119b92d60860527d2cee15b6898be04659d6021510c",
       "sha256_packaged": "cc8126ec9a4dc9f228a40492e0d136c17abad9466a4ba1e07d58f28d18508548"
+    },
+    "intervals-extended.html": {
+      "original": "new exercise based on intervals.html",
+      "sha256_original": null,
+      "sha256_packaged": "505ddf8ce8f4d5ad001154287bb560b79cdefb03e5c530d999bd5257e87ed28e"
     }
   }
 }
