@@ -250,10 +250,12 @@ h1{font-size:30px;margin:0;letter-spacing:-.9px;font-weight:730}
 @media(max-width:530px){.staff-area{height:130px}.staff-area svg{height:125px}.letter-answers{gap:7px;margin-top:10px}.letter-answers .choice{min-height:49px;font-size:22px}.audio-area{min-height:90px}.orb{width:100px;height:100px}.feedback-icon{font-size:55px}}
 @media(max-width:530px) and (max-height:740px){.staff-area{height:105px}.staff-area svg{height:105px}.audio-area{min-height:80px}.orb{width:80px;height:80px}.letter-answers .choice{min-height:42px}}
 
-/* The existing replay button now covers the orb; its label appears after playback. */
-.orb > .replay-control{position:absolute;inset:0;z-index:4;display:flex;align-items:flex-end;justify-content:center;width:100%;height:100%;min-height:0;padding:0 4px 13px;border:0;border-radius:50%;background:transparent;color:#c9f8df;cursor:pointer;touch-action:manipulation;transform:none}
-.orb > .replay-control:hover:not(:disabled){background:#b4dbca0a;transform:none}
-.orb > .replay-control::after{content:'Повторить';font-size:12px;font-weight:600;line-height:1.2}
+/* Replay uses the same central position as Play, without a second button outline. */
+.orb > .replay-control{position:absolute;inset:0;z-index:4;display:flex;align-items:center;justify-content:center;width:100%;height:100%;min-width:0;min-height:0;margin:0;padding:0;border:0;border-radius:50%;background:transparent;box-shadow:none;color:#c9f8df;cursor:pointer;touch-action:manipulation;transform:none}
+.orb > .replay-control:hover:not(:disabled){background:transparent;transform:none}
+.orb > .replay-control::after{content:none}
+.orb > .replay-control > .replay-icon{display:block;width:42px;height:42px;flex:none}
+.card:not(.idle) .orb:not(.playing):has(> .replay-control:not(:disabled)) > :is(.bars,.feedback-icon,.note-name){visibility:hidden}
 .orb > .replay-control > span{display:none}
 .orb > .replay-control:disabled,.orb.playing > .replay-control,.idle .orb > .replay-control{visibility:hidden}
 .orb > .replay-control:focus-visible{outline:2px solid #d5f8e2;outline-offset:4px}
@@ -266,7 +268,7 @@ body > .credits{width:min(100%,600px);margin:12px auto 0;flex:none}
  main > .card{flex:1 1 auto;min-height:0}
  main > .metrics,main > .bottom{flex-shrink:0}
  .headrow{align-items:flex-start}
- .orb > .replay-control{padding-bottom:11px}
+ .orb > .replay-control{padding:0}
  body > .credits{margin-top:12px}
 }
 </style></head><body>
@@ -274,7 +276,7 @@ body > .credits{width:min(100%,600px);margin:12px auto 0;flex:none}
  <div class="headrow"><div><h1>Русские и английские ноты</h1><p class="sub">Соотнесите русское и английское названия ноты.</p></div><div class="round-actions"><a class="back-link" href="./index.html">← К упражнениям</a></div></div>
  <div class="mode-row"><div class="mode-switch direction-switch" role="group" aria-label="Язык названия ноты"><button type="button" id="russianDirection" class="mode-btn active" aria-pressed="true" aria-label="Русское название, ответ по-английски">РУСС</button><button type="button" id="englishDirection" class="mode-btn" aria-pressed="false" aria-label="Английское название, ответ по-русски">ENG</button><button type="button" id="bothDirections" class="mode-btn" aria-pressed="false" aria-label="Оба языка, случайный выбор">ОБА</button></div><div class="mode-switch" role="group" aria-label="Выбор инструмента"><button type="button" id="electronicMode" class="mode-btn active" aria-pressed="true">Электронное</button><button type="button" id="pianoMode" class="mode-btn" aria-pressed="false">Пианино</button></div></div>
  <div class="staff-area"><svg viewBox="0 0 260 130" role="img" aria-label="Нота в скрипичном ключе"><g stroke="currentColor" stroke-width="1.3"><path d="M20 50H245 M20 60H245 M20 70H245 M20 80H245 M20 90H245"/><path id="ledger" d="M153 100H187" visibility="hidden"/><path id="stem" d="M178 100V65"/></g><text x="29" y="90" font-size="66" font-family="Bravura, Noto Music, Apple Symbols, serif" fill="currentColor">𝄞</text><ellipse id="staffNote" cx="170" cy="100" rx="9" ry="5.5" transform="rotate(-18 170 100)" fill="currentColor" visibility="hidden"/></svg></div>
- <div class="audio-area"><div class="orb" id="orb"><button class="soft replay-control" id="replay" type="button" disabled aria-label="Повторить вопрос"><span class="replay-symbol" aria-hidden="true">↻</span><span class="replay-label" id="replayLabel">Повторить<br>вопрос</span><span class="space-hint">(Пробел)</span></button><button class="orb-start" id="start" type="button" aria-label="Начать тренировку"><span aria-hidden="true">▶</span><small>НАЧАТЬ</small></button><div class="note-name" id="noteName" aria-live="polite"></div><div class="bars" id="bars"><span class="bar"></span><span class="bar"></span><span class="bar"></span><span class="bar"></span><span class="bar"></span><span class="bar"></span></div><div class="feedback-icon" id="feedbackIcon"></div></div></div>
+ <div class="audio-area"><div class="orb" id="orb"><button class="soft replay-control" id="replay" type="button" disabled aria-label="Повторить вопрос"><svg class="replay-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10a9 9 0 1 1 2.7 8.4"/><path d="M3 4v6h6"/></svg><span class="replay-symbol" aria-hidden="true">↻</span><span class="replay-label" id="replayLabel">Повторить<br>вопрос</span><span class="space-hint">(Пробел)</span></button><button class="orb-start" id="start" type="button" aria-label="Начать тренировку"><span aria-hidden="true">▶</span><small>НАЧАТЬ</small></button><div class="note-name" id="noteName" aria-live="polite"></div><div class="bars" id="bars"><span class="bar"></span><span class="bar"></span><span class="bar"></span><span class="bar"></span><span class="bar"></span><span class="bar"></span></div><div class="feedback-icon" id="feedbackIcon"></div></div></div>
  <div class="prompt" aria-live="polite"><strong id="prompt">Нажмите «Начать».</strong><small id="detail">Послушайте ноту и выберите её английское обозначение.</small></div>
  <div class="letter-answers" id="noteAnswers" aria-label="Английское обозначение ноты"><button class="choice" data-letter="C" disabled>C</button><button class="choice" data-letter="D" disabled>D</button><button class="choice" data-letter="E" disabled>E</button><button class="choice" data-letter="F" disabled>F</button><button class="choice" data-letter="G" disabled>G</button><button class="choice" data-letter="A" disabled>A</button><button class="choice" data-letter="B" disabled>B</button></div>
 

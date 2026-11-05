@@ -19,10 +19,12 @@ main{width:min(100%,600px);position:relative}.card{position:relative;overflow:hi
 @media(max-width:360px){.mode-row{gap:3px}.mode-row .mode-btn{padding:9px 3px;font-size:9px}}
 @media(prefers-reduced-motion:reduce){.orb.playing .bar{animation:none}.choice{transition:none}}
 
-/* The existing replay button now covers the orb; its label appears after playback. */
-.orb > .replay-control{position:absolute;inset:0;z-index:4;display:flex;align-items:flex-end;justify-content:center;width:100%;height:100%;min-height:0;padding:0 4px 13px;border:0;border-radius:50%;background:transparent;color:#c9f8df;cursor:pointer;touch-action:manipulation;transform:none}
-.orb > .replay-control:hover:not(:disabled){background:#b4dbca0a;transform:none}
-.orb > .replay-control::after{content:'Повторить';font-size:12px;font-weight:600;line-height:1.2}
+/* Replay uses the same central position as Play, without a second button outline. */
+.orb > .replay-control{position:absolute;inset:0;z-index:4;display:flex;align-items:center;justify-content:center;width:100%;height:100%;min-width:0;min-height:0;margin:0;padding:0;border:0;border-radius:50%;background:transparent;box-shadow:none;color:#c9f8df;cursor:pointer;touch-action:manipulation;transform:none}
+.orb > .replay-control:hover:not(:disabled){background:transparent;transform:none}
+.orb > .replay-control::after{content:none}
+.orb > .replay-control > .replay-icon{display:block;width:42px;height:42px;flex:none}
+.card:not(.idle) .orb:not(.playing):has(> .replay-control:not(:disabled)) > :is(.bars,.feedback-icon,.note-name){visibility:hidden}
 .orb > .replay-control > span{display:none}
 .orb > .replay-control:disabled,.orb.playing > .replay-control,.idle .orb > .replay-control{visibility:hidden}
 .orb > .replay-control:focus-visible{outline:2px solid #d5f8e2;outline-offset:4px}
@@ -35,7 +37,7 @@ body > .credits{width:min(100%,600px);margin:12px auto 0;flex:none}
  main > .card{flex:1 1 auto;min-height:0}
  main > .metrics,main > .bottom{flex-shrink:0}
  .headrow{align-items:flex-start}
- .orb > .replay-control{padding-bottom:11px}
+ .orb > .replay-control{padding:0}
  body > .credits{margin-top:12px}
 }
 
@@ -47,7 +49,7 @@ body > .credits{width:min(100%,600px);margin:12px auto 0;flex:none}
 </style></head><body><main><section class="card idle" id="card" aria-label="Какой интервал?">
 <div class="headrow"><div><h1>Какой интервал?</h1><p class="sub">Определите на слух малую или большую секунду, малую или большую терцию.</p></div><div class="round-actions"><a class="back-link" href="./index.html">← К упражнениям</a></div></div>
 <div class="mode-row"><div class="mode-switch" role="group" aria-label="Тип интервала"><button type="button" id="melodic" class="mode-btn active" aria-pressed="true">Мелодический</button><button type="button" id="harmonic" class="mode-btn" aria-pressed="false">Гармонический</button></div><div class="mode-switch" role="group" aria-label="Выбор инструмента"><button type="button" id="electric" class="mode-btn" aria-pressed="false">Электронное</button><button type="button" id="piano" class="mode-btn active" aria-pressed="true">Пианино</button></div></div>
-<div class="audio-area"><div class="orb" id="orb"><button class="soft replay-control" id="repeat" disabled><span class="replay-symbol">↻</span><span class="replay-label" id="repeatLabel">Повторить вопрос</span><span class="space-hint">ПРОБЕЛ</span></button><button type="button" id="start" class="orb-start" aria-label="Начать тренировку"><span aria-hidden="true">▶</span><small>НАЧАТЬ</small></button><div class="bars"><span class="bar"></span><span class="bar"></span><span class="bar"></span><span class="bar"></span><span class="bar"></span><span class="bar"></span></div><div class="feedback-icon" id="feedbackIcon"></div></div></div>
+<div class="audio-area"><div class="orb" id="orb"><button class="soft replay-control" id="repeat" disabled><svg class="replay-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10a9 9 0 1 1 2.7 8.4"/><path d="M3 4v6h6"/></svg><span class="replay-symbol">↻</span><span class="replay-label" id="repeatLabel">Повторить вопрос</span><span class="space-hint">ПРОБЕЛ</span></button><button type="button" id="start" class="orb-start" aria-label="Начать тренировку"><span aria-hidden="true">▶</span><small>НАЧАТЬ</small></button><div class="bars"><span class="bar"></span><span class="bar"></span><span class="bar"></span><span class="bar"></span><span class="bar"></span><span class="bar"></span></div><div class="feedback-icon" id="feedbackIcon"></div></div></div>
 <div class="prompt" aria-live="polite"><strong id="prompt">Слушайте два звука.</strong><small id="hint">Первый звук, затем второй.</small></div>
 <div class="answers" aria-label="Какой интервал звучит?"><button class="choice" data-interval="1" disabled>м.2<small>Малая секунда</small></button><button class="choice" data-interval="2" disabled>б.2<small>Большая секунда</small></button><button class="choice" data-interval="3" disabled>м.3<small>Малая терция</small></button><button class="choice" data-interval="4" disabled>б.3<small>Большая терция</small></button></div>
 <div class="feedback" id="feedback" aria-live="polite"></div><div class="explanation" id="explanation"></div>
@@ -211,7 +213,7 @@ function next(){
 }
 function updateExplanation(){
  if(!$('unpack').checked){$('explanation').textContent='';return}
- $('explanation').textContent='Расстояние между звуками — '+round.distance+' '+(round.distance===1?'полутон':'полутона')+'. '+(intervalType==='harmonic'?'Звуки звучат одновременно.':'Второй звук '+(round.dir>0?'выше':'ниже')+' первого.')+' Нажмите на круг «Повторить», чтобы услышать их ещё раз.';
+ $('explanation').textContent='Расстояние между звуками — '+round.distance+' '+(round.distance===1?'полутон':'полутона')+'. '+(intervalType==='harmonic'?'Звуки звучат одновременно.':'Второй звук '+(round.dir>0?'выше':'ниже')+' первого.')+' Нажмите на круговую стрелку, чтобы услышать их ещё раз.';
 }
 function answer(distance){
  if(state!=='question'||loading||playTimer!==null||endTimer!==null)return;
