@@ -233,28 +233,48 @@ h1{font-size:30px;margin:0;letter-spacing:-.9px;font-weight:730}
  .footrow .replay-control{min-height:52px;padding:6px 9px}
  .replay-control .replay-label{font-size:14px}
 }
+
+/* The existing replay button now covers the orb; its label appears after playback. */
+.orb > .replay-control{position:absolute;inset:0;z-index:4;display:flex;align-items:flex-end;justify-content:center;width:100%;height:100%;min-height:0;padding:0 4px 13px;border:0;border-radius:50%;background:transparent;color:#c9f8df;cursor:pointer;touch-action:manipulation;transform:none}
+.orb > .replay-control:hover:not(:disabled){background:#b4dbca0a;transform:none}
+.orb > .replay-control::after{content:'Повторить';font-size:12px;font-weight:600;line-height:1.2}
+.orb > .replay-control > span{display:none}
+.orb > .replay-control:disabled,.orb.playing > .replay-control,.idle .orb > .replay-control{visibility:hidden}
+.orb > .replay-control:focus-visible{outline:2px solid #d5f8e2;outline-offset:4px}
+.orb .orb-start{position:absolute;inset:0;z-index:5;justify-content:center;align-items:center;border-radius:50%;width:100%;height:100%;margin:0}
+body{flex-direction:column}
+body > .credits{width:min(100%,600px);margin:12px auto 0;flex:none}
+@media(max-width:530px){
+ body{height:auto;min-height:100svh;display:flex;flex-direction:column;padding:max(11px,env(safe-area-inset-top)) 12px max(11px,env(safe-area-inset-bottom))}
+ main{height:calc(100svh - max(11px,env(safe-area-inset-top)) - max(11px,env(safe-area-inset-bottom)));min-height:calc(100svh - max(11px,env(safe-area-inset-top)) - max(11px,env(safe-area-inset-bottom)));flex:none;margin:0 auto}
+ main > .card{flex:1 1 auto;min-height:0}
+ main > .metrics,main > .bottom{flex-shrink:0}
+ .headrow{align-items:flex-start}
+ .orb > .replay-control{padding-bottom:11px}
+ body > .credits{margin-top:12px}
+}
 </style>
 </head>
 <body>
 <main>
  <section class="card idle" id="card" aria-label="Сколько нот?">
-  <div class="headrow"><div><h1>Сколько нот?</h1><p class="sub">Сколько разных нот звучит одновременно?</p></div><div class="round-actions"><a class="back-link" href="./index.html">← К упражнениям</a><span class="round" id="round">Готово</span></div></div>
+  <div class="headrow"><div><h1>Сколько нот?</h1><p class="sub">Сколько разных нот звучит одновременно?</p></div><div class="round-actions"><a class="back-link" href="./index.html">← К упражнениям</a></div></div>
   <div class="mode-row" aria-label="Режим звучания"><span class="mode-label">ЗВУЧАНИЕ</span><div class="mode-switch" role="group" aria-label="Выбор инструмента"><button type="button" id="electronicMode" class="mode-btn active" aria-pressed="true">Электронное</button><button type="button" id="pianoMode" class="mode-btn" aria-pressed="false">Пианино</button></div></div>
-  <div class="audio-area"><div class="orb" id="orb"><button class="orb-start" id="start" type="button" aria-label="Начать тренировку"><span aria-hidden="true">▶</span><small>НАЧАТЬ</small></button><div class="bars" id="bars"><span class="bar"></span><span class="bar"></span><span class="bar"></span><span class="bar"></span><span class="bar"></span><span class="bar"></span></div><div class="note-name" id="noteName" aria-live="polite"></div><div class="feedback-icon" id="feedbackIcon"></div></div></div>
+  <div class="audio-area"><div class="orb" id="orb"><button class="soft replay-control" id="replay" type="button" disabled aria-label="Повторить вопрос"><span class="replay-symbol" aria-hidden="true">↻</span><span class="replay-label" id="replayLabel">Повторить<br>вопрос</span><span class="space-hint">(Пробел)</span></button><button class="orb-start" id="start" type="button" aria-label="Начать тренировку"><span aria-hidden="true">▶</span><small>НАЧАТЬ</small></button><div class="bars" id="bars"><span class="bar"></span><span class="bar"></span><span class="bar"></span><span class="bar"></span><span class="bar"></span><span class="bar"></span></div><div class="note-name" id="noteName" aria-live="polite"></div><div class="feedback-icon" id="feedbackIcon"></div></div></div>
   <div class="prompt" aria-live="polite"><strong id="prompt">Слушайте и отвечайте интуитивно.</strong><small id="detail">Нажмите 2, 3 или 4 на клавиатуре.</small></div>
   <div class="answers" aria-label="Количество нот">
    <button class="choice" id="answer2" data-guess="2" disabled>2<small>НОТЫ</small></button>
    <button class="choice" id="answer3" data-guess="3" disabled>3<small>НОТЫ</small></button>
    <button class="choice" id="answer4" data-guess="4" disabled>4<small>НОТЫ</small></button>
   </div>
-  <div class="footrow"><button class="soft replay-control" id="replay" type="button" disabled aria-label="Повторить вопрос"><span class="replay-symbol" aria-hidden="true">↻</span><span class="replay-label" id="replayLabel">Повторить<br>вопрос</span><span class="space-hint">(Пробел)</span></button><span id="roundNote" hidden>Без ограничений</span></div>
+  <span id="roundNote" hidden>Без ограничений</span>
   <div class="progress"><div id="progress"></div></div>
   <div class="confetti-layer" id="confetti" aria-hidden="true"></div>
  </section>
  <div class="metrics" aria-label="Статистика упражнений"><div class="metric"><b id="answersTotal">0</b><span>ОТВЕТОВ</span></div><div class="metric"><b id="correct">0</b><span>ПРАВИЛЬНО</span></div><div class="metric"><b id="accuracy">—</b><span>ТОЧНОСТЬ</span></div><div class="metric"><b id="streak">0</b><span>СЕРИЯ</span></div><div class="metric"><b id="bestStreak">0</b><span>РЕКОРД</span></div></div>
  <div class="bottom"><label><input id="sounds" type="checkbox" checked>Звуковые сигналы</label><label><input id="unpack" type="checkbox" checked>Разбирать ошибки</label><button id="reset">Сбросить</button></div>
- <div class="credits" id="credits">Звук пианино: <a href="https://www.timbrechbill.com/soundfonts/" target="_blank" rel="noreferrer">TimGM6mb</a> (Тим Брекбилл и Дэвид Болтон, <a href="https://www.gnu.org/licenses/old-licenses/gpl-2.0.html" target="_blank" rel="noreferrer">GPL-2.0</a>) · Электронный звук: <a href="https://member.keymusician.com/Member/FluidR3_GM/README.html" target="_blank" rel="noreferrer">FluidR3_GM</a> (Frank Wen, MIT). Сэмплы обработаны для тренажёра.</div>
-</main>
+
+</main><div class="credits" id="credits">Звук пианино: <a href="https://www.timbrechbill.com/soundfonts/" target="_blank" rel="noreferrer">TimGM6mb</a> (Тим Брекбилл и Дэвид Болтон, <a href="https://www.gnu.org/licenses/old-licenses/gpl-2.0.html" target="_blank" rel="noreferrer">GPL-2.0</a>) · Электронный звук: <a href="https://member.keymusician.com/Member/FluidR3_GM/README.html" target="_blank" rel="noreferrer">FluidR3_GM</a> (Frank Wen, MIT). Сэмплы обработаны для тренажёра.</div>
 <script>
 (() => {
 'use strict';
@@ -569,7 +589,7 @@ function update(){
  $('correct').textContent=String(hits);
  $('accuracy').textContent=total ? Math.round(hits/total*100)+'%' : '—';
  $('streak').textContent=String(streak);
- $('round').textContent=started?'ВОПРОС '+(total+1):'Готово';
+
  $('progress').style.width=(total ? hits/total*100 : 0)+'%';
  $('answersTotal').textContent=String(total);
  $('bestStreak').textContent=String(best);
