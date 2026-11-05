@@ -231,7 +231,8 @@ function answer(distance){
  feedbackSound(ok);
  if(!ok&&$('unpack').checked)play(true);
  else {
-  scheduleAdvance($('unpack').checked?4600:1800);
+  const advanceDelay=$('unpack').checked?4600:1800;
+  scheduleAdvance(ok?advanceDelay*.7:advanceDelay);
   if(performance.now()<busyUntil)endTimer=setTimeout(()=>{endTimer=null;refreshControls()},Math.max(0,busyUntil-performance.now()));
   refreshControls();
  }
