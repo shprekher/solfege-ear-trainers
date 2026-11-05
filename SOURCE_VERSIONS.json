@@ -4,32 +4,32 @@
     "intervals.html": {
       "original": "solfege_intervals_v3.html",
       "sha256_original": "26b668f348ce22a124dc5fb7ef9f03af1a1f06632c1265d16205f6a1acf2a150",
-      "sha256_packaged": "f6557225f4c62adf24e76daeed297819590a0b0a52312616b92c9410b03a16ea"
+      "sha256_packaged": "c23476941cb0eeb1bc4dcd5e0a6ce8d6fe2fd85b82cab41c5d5fdfd95e074ec1"
     },
     "note-reading.html": {
       "original": "new exercise based on note-names.html",
       "sha256_original": null,
-      "sha256_packaged": "9b273168e4a167ef65799297fc87b7971047b1006356f8970af49639701e0aa3"
+      "sha256_packaged": "f2b4f88efcb5dc6a65a6c04b9d29bcf59b2b052b8b6c3b30f93cf643dc23edeb"
     },
     "note-names.html": {
       "original": "new exercise created for this project",
       "sha256_original": null,
-      "sha256_packaged": "b7d9653ee2f1d3253001dc2b3b38132daed1149be248cafbcf8c85259057a72b"
+      "sha256_packaged": "785374d90148fe6dc52b531de0772d050c741de6909012f03c8b35ac34e571b4"
     },
     "half-step.html": {
       "original": "new exercise created for this project",
       "sha256_original": null,
-      "sha256_packaged": "f8fe0373d67ffe5742d2438fcaebcc9515e909f527d9c486dc17017abc5173a1"
+      "sha256_packaged": "06657102781f65c4eb5abb3ebc94c8f2a8e2d78a4741e5bd2fa5b9d9b4875f91"
     },
     "count-notes.html": {
       "original": "count_the_notes_trainer_ru_v7.html",
       "sha256_original": "219b87910a82ccba8ce6b571079e973a81e7e61740a26c424904e3749c5ba686",
-      "sha256_packaged": "a7da73c05f8330c6ffb86104abbfb6899c009bfd22c9492fa2a814fe40c073dd"
+      "sha256_packaged": "fd16d06a17afac46e7b1d6462f63c59339e1a03aec8c4a77c66438306d567eaa"
     },
     "shifted-voice.html": {
       "original": "which_voice_shifted_ru_v8.html",
       "sha256_original": "25099db8c7bd581b324b2119b92d60860527d2cee15b6898be04659d6021510c",
-      "sha256_packaged": "5e6ad3e6dc25de98bc4ed267e92bc85d461cee62c4559e39fe1e29755d85cb9d"
+      "sha256_packaged": "cc8126ec9a4dc9f228a40492e0d136c17abad9466a4ba1e07d58f28d18508548"
     }
   }
 }

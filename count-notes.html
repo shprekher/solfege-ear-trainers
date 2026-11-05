@@ -277,9 +277,10 @@ body > .credits{width:min(100%,600px);margin:12px auto 0;flex:none}
  <div class="bottom"><label><input id="sounds" type="checkbox" checked>Звуковые сигналы</label><label><input id="unpack" type="checkbox" checked>Разбирать ошибки</label><button id="reset">Сбросить</button></div>
 
 </main><div class="credits" id="credits">Звук пианино: <a href="https://www.timbrechbill.com/soundfonts/" target="_blank" rel="noreferrer">TimGM6mb</a> (Тим Брекбилл и Дэвид Болтон, <a href="https://www.gnu.org/licenses/old-licenses/gpl-2.0.html" target="_blank" rel="noreferrer">GPL-2.0</a>) · Электронный звук: <a href="https://member.keymusician.com/Member/FluidR3_GM/README.html" target="_blank" rel="noreferrer">FluidR3_GM</a> (Frank Wen, MIT). Сэмплы обработаны для тренажёра.</div>
-<script>
+<script src="./progress-store.js"></script><script>
 (() => {
 'use strict';
+const progress=window.SolfegeProgress?.tracker('count-notes')||{record(){},reset(){}};
 let ctx, limiter, started=false, locked=true, total=0, hits=0, streak=0, best=0, current=[], activeTimers=[];
 let liveVoices = [];
 let lastTestEndMs = -Infinity, testReplayQueued = false, confettiTimer = null;
@@ -646,6 +647,7 @@ function mark(guess){
  if(!started||locked)return;
  locked=true;
  const answer=current.length, ok=guess===answer;
+ progress.record({correct:ok,mode:{timbre:selectedMode,voices:current.length},task:'voices-'+current.length,expected:String(answer),actual:String(guess)});
  total++;if(ok){hits++;streak++;best=Math.max(best,streak)}else{streak=0}
  buttons.forEach(b=>{b.disabled=true;if(Number(b.dataset.guess)===answer)b.classList.add('correct');if(!ok&&Number(b.dataset.guess)===guess)b.classList.add('incorrect')});
  $('replay').disabled=true;
@@ -713,7 +715,7 @@ async function begin(){
  if(started)return;
  started=true;lastTestEndMs=-Infinity;testReplayQueued=false;total=0;hits=0;streak=0;best=0;$('card').classList.remove('idle');next();
 }
-function reset(){beginRequest++;cancelTimers();cancelReviewAdvance();reviewMode=false;testReplayQueued=false;lastTestEndMs=-Infinity;started=false;locked=true;current=[];total=0;hits=0;streak=0;best=0;clearFeedback();update();updateReplayButton();$('card').classList.add('idle');$('prompt').textContent='Слушайте и отвечайте интуитивно.';$('detail').textContent='Нажмите 2, 3 или 4 на клавиатуре.';buttons.forEach(b=>b.disabled=true);}
+function reset(){progress.reset();beginRequest++;cancelTimers();cancelReviewAdvance();reviewMode=false;testReplayQueued=false;lastTestEndMs=-Infinity;started=false;locked=true;current=[];total=0;hits=0;streak=0;best=0;clearFeedback();update();updateReplayButton();$('card').classList.add('idle');$('prompt').textContent='Слушайте и отвечайте интуитивно.';$('detail').textContent='Нажмите 2, 3 или 4 на клавиатуре.';buttons.forEach(b=>b.disabled=true);}
 $('start').addEventListener('click',begin);
 $('electronicMode').addEventListener('click',()=>selectMode('electronic'));
 $('pianoMode').addEventListener('click',()=>selectMode('piano'));

@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#10141a">
+<title>Мой прогресс — тренажёры музыкального слуха</title>
+<style>
+:root{color-scheme:dark;--bg:#10141a;--ink:#f1f4f6;--muted:#a8b4bd;--accent:#b4dbca}
+*{box-sizing:border-box}body{margin:0;padding:24px 16px 40px;background:radial-gradient(ellipse at 50% -20%,#25363a 0%,transparent 52%),var(--bg);color:var(--ink);font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif}main{max-width:900px;margin:auto}a{color:var(--accent)}h1{font-size:32px;letter-spacing:-.7px;margin:18px 0 10px}h2{font-size:21px;margin:0 0 14px}h3{font-size:16px;margin:18px 0 10px}p{color:var(--muted);line-height:1.55;margin:8px 0}.panel{border:1px solid #3c454d;border-radius:22px;background:linear-gradient(180deg,#1d2630,#171e26);padding:22px;margin-top:18px}.metrics{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin:18px 0}.metric{background:#151b22;border:1px solid #303b45;border-radius:14px;padding:17px 10px;text-align:center}.metric b{display:block;font-size:29px;color:var(--ink)}.metric span{display:block;font-size:12px;color:var(--muted);margin-top:5px}.filters{display:grid;grid-template-columns:1fr 1fr;gap:14px}label{display:block;font-size:13px;color:var(--muted)}select,button,.file-button{font:inherit;border:1px solid #43515b;border-radius:10px;background:#26333c;color:var(--ink);padding:11px 13px;min-height:44px}select{display:block;width:100%;margin-top:7px;min-width:0}button,.file-button{cursor:pointer}button:hover,.file-button:hover{background:#31414b}button:disabled{opacity:.5;cursor:wait}button:focus-visible,select:focus-visible,a:focus-visible{outline:2px solid #d5f8e2;outline-offset:3px}.actions{display:flex;flex-wrap:wrap;gap:10px;margin-top:14px}.danger{color:#ffb5b5;border-color:#82545d}.level{font-size:36px;font-weight:700;margin:16px 0 0;color:var(--accent)}.muted{font-size:12px}.chart{width:100%;height:auto;display:block;margin-top:16px}.scroll-table{overflow-x:auto;max-width:100%}table{width:100%;border-collapse:collapse;font-size:13px;text-align:left}th,td{padding:11px 7px;border-bottom:1px solid #34404a;vertical-align:top}th{font-weight:600;color:var(--muted)}td:first-child{min-width:115px}th:nth-child(n+2),td:nth-child(n+2){text-align:right}.empty{padding:20px 0;color:var(--muted)}.week{display:flex;gap:8px;flex-wrap:wrap;margin:15px 0}.day{padding:8px 10px;border-radius:10px;border:1px solid #3c454d;color:var(--muted);font-size:12px}.day.active{background:#244538;color:#d5f8e2;border-color:#608a75}.status{min-height:24px;color:var(--accent);overflow-wrap:anywhere}.error{color:#ffb5b5}[hidden]{display:none!important}
+@media(max-width:530px){body{padding:16px 12px 30px}.panel{padding:18px 14px;border-radius:18px}.metrics{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.filters{grid-template-columns:1fr;gap:12px}h1{font-size:28px}.actions button{flex:1 1 145px}.metric b{font-size:26px}th,td{padding:10px 5px;font-size:12px}.day{padding:7px 8px}.week{gap:6px}}
+</style>
+<script src="./progress-store.js" defer></script>
+<script src="./progress-page.js" defer></script>
+</head>
+<body><main>
+<header><a href="./index.html">← К упражнениям</a><h1>Мой прогресс</h1><p>История хранится только в этом браузере. Без регистрации и передачи статистики на сервер.</p></header>
+<p id="status" class="status" role="status" aria-live="polite">Загружаем локальную историю…</p>
+<section aria-label="Общие показатели">
+<div class="metrics"><div class="metric"><b id="sessions">—</b><span>Тренировок</span></div><div class="metric"><b id="answers">—</b><span>Ответов</span></div><div class="metric"><b id="days">—</b><span>Дней активности</span></div><div class="metric"><b id="currentDays">—</b><span>Дней подряд</span></div></div>
+</section>
+<section class="panel" aria-labelledby="regularityTitle"><h2 id="regularityTitle">Регулярность и рекорды</h2><div id="week" class="week" aria-label="Активность за последние семь дней"></div><p id="regularity"></p><p id="milestone" class="muted"></p></section>
+<section class="panel" aria-labelledby="exerciseTitle"><h2 id="exerciseTitle">Прогресс по упражнению</h2>
+<div class="filters"><label>Упражнение<select id="exercise"></select></label><label>Режим и сложность<select id="mode"></select></label></div>
+<p id="level" class="level">—</p><p id="levelNote"></p><p class="muted">Текущая точность — последние 30 ответов в выбранном режиме. Пока ответов меньше 30, оценка предварительная. Тембр, ключ, язык, число голосов и тип интервала не смешиваются.</p>
+<div id="trend"></div><p class="muted" id="trendNote"></p><p id="records"></p>
+<h3>Ошибки по типам заданий</h3><p class="muted">За всё время в выбранном режиме. Типы с ошибками показаны первыми.</p><div id="errors"></div>
+</section>
+<section class="panel" aria-labelledby="historyTitle"><h2 id="historyTitle">Последние тренировки</h2><p class="muted">Тренировка начинается с первого ответа. Новый запуск, сброс или перерыв более 30 минут начинают новую тренировку. Повторы звука не считаются ответами.</p><div id="history"></div></section>
+<section class="panel" aria-labelledby="dataTitle"><h2 id="dataTitle">Мои данные</h2><p>История привязана к адресу сайта и профилю браузера. Очистка данных браузера или приватный режим могут удалить её. Для переноса на другое устройство сохраните JSON.</p><p class="muted">Обновление сайта не очищает историю. Кнопка «Сбросить» в упражнении сбрасывает только текущие показатели.</p>
+<div class="actions"><button id="export" type="button" disabled>Экспорт JSON</button><button id="import" type="button" disabled>Импорт JSON</button><button id="delete" class="danger" type="button" disabled>Удалить историю</button></div><input id="file" type="file" accept="application/json,.json" hidden><p class="muted">Импорт объединяет историю, не дублирует уже сохранённые ответы и не заменяет существующие данные. Максимум 20 МБ / 100 000 ответов в файле.</p></section>
+</main></body></html>

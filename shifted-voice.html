@@ -348,9 +348,10 @@ body > .credits{width:min(100%,600px);margin:12px auto 0;flex:none}
  <div class="bottom"><label><input id="sounds" type="checkbox" checked>Звуковые сигналы</label><label><input id="unpack" type="checkbox" checked>Разбирать ошибки</label><button id="reset">Сбросить</button></div>
 
 </main><div class="credits" id="credits">Звук пианино: <a href="https://www.timbrechbill.com/soundfonts/" target="_blank" rel="noreferrer">TimGM6mb</a> (Тим Брекбилл и Дэвид Болтон, <a href="https://www.gnu.org/licenses/old-licenses/gpl-2.0.html" target="_blank" rel="noreferrer">GPL-2.0</a>) · Электронный звук: <a href="https://member.keymusician.com/Member/FluidR3_GM/README.html" target="_blank" rel="noreferrer">FluidR3_GM</a> (Frank Wen, MIT). Сэмплы обработаны для тренажёра.</div>
-<script>
+<script src="./progress-store.js"></script><script>
 (() => {
 'use strict';
+const progress=window.SolfegeProgress?.tracker('shifted-voice')||{record(){},reset(){}};
 let ctx, limiter, started=false, locked=true, total=0, hits=0, streak=0, best=0, current=[], activeTimers=[];
 let liveVoices=[];
 let selectedVoice=null, stage='voice', targetVoice=0, direction=1, movedPitch=0, reviewMode=false, exerciseSoundUntilMs=0;
@@ -696,6 +697,7 @@ function mark(guessDirection){
  locked=true;enableAnswer(false);
  const correctVoice=displayVoice(targetVoice,current.length);
  const ok=selectedVoice===correctVoice&&guessDirection===direction;
+ progress.record({correct:ok,mode:{timbre:selectedMode,voices:current.length},task:'voice-'+correctVoice+'-'+(direction>0?'up':'down'),expected:voiceNames[correctVoice]+' · '+(direction>0?'выше':'ниже'),actual:voiceNames[selectedVoice]+' · '+(guessDirection>0?'выше':'ниже')});
  total++;if(ok){hits++;streak++;best=Math.max(best,streak);}else streak=0;
  const truth=voiceNames[correctVoice].toLowerCase();
  const verb=direction>0?'на полтона выше':'на полтона ниже';
@@ -758,7 +760,7 @@ async function begin(){
  if(started)return;
  started=true;lastTrialEndMs=-Infinity;trialReplayQueued=false;total=0;hits=0;streak=0;best=0;reviewMode=false;exerciseSoundUntilMs=0;$('card').classList.remove('idle');next();
 }
-function reset(){beginRequest++;
+function reset(){progress.reset();beginRequest++;
  cancelTimers();cancelReviewAdvance();trialReplayQueued=false;lastTrialEndMs=-Infinity;started=false;locked=true;reviewMode=false;exerciseSoundUntilMs=0;current=[];total=0;hits=0;streak=0;best=0;selectedVoice=null;stage='voice';
  clearFeedback();update();$('card').classList.add('idle');$('prompt').textContent='Определите, какая нота изменилась.';$('detail').textContent='Слушайте созвучие, затем одиночную ноту.';
  $('voiceHint').textContent='Шаг 1. Какой голос?';setVoiceOptions();enableAnswer(false);
