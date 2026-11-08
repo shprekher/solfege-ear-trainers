@@ -40,3 +40,8 @@ gh repo create solfege-ear-trainers --public --source=. --remote=origin --push
 
 Официальная информация: [Tuqo Git CD](https://tuqo.ru/git/), [Tuqo бесплатный тариф](https://tuqo.ru/hosting-v-rossii/).
 
+## Раздел диктантов и Telegram-бот
+
+`dictations.html`, `dictation.html` и их CSS/JS публикуются тем же статическим Git CD. Проверяйте также `/dictations.html`. Бот **не запускается на статическом хостинге**: это отдельный Python-процесс на компьютере/VPS, который выдаёт файлы `.solfege` для явного импорта на сайте. Установка BotFather, разрешённые Telegram ID, приватный каталог данных и systemd описаны в [DICTATIONS_SETUP.md](DICTATIONS_SETUP.md).
+
+Не размещайте токен, настоящие `.env`, SQLite или записи преподавателя в публичном каталоге/репозитории. `.gitignore` исключает такие файлы, но сам по себе не защищает локальный HTTP-сервер, если вручную положить приватные материалы в обслуживаемую папку. По умолчанию бот хранит их вне папки сайта.

@@ -9,3 +9,9 @@ Thumbs.db
 node_modules/
 __pycache__/
 *.log
+# Private dictation recordings and bot state must never reach the public site.
+dictation-data/
+*.solfege
+*.sqlite3
+*.sqlite3-*
+/tests/dictation-fixtures/

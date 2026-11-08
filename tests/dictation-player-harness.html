@@ -1,0 +1,12 @@
+<!doctype html><html lang="ru"><meta charset="utf-8"><title>Изолированный плеер</title><script>
+(async()=>{
+  const db=new URLSearchParams(location.search).get('db');
+  if(!db||!db.startsWith('solfege-dictation-test-'))throw Error('Нужна временная тестовая база');
+  const view=new URLSearchParams(location.search).get('view')==='collections'?'dictations.html':'dictation.html';
+  const html=await(await fetch('../'+view)).text();
+  const base=new URL('../',location.href).href;
+  const code='window.Dictations=Object.freeze({...window.Dictations,store:window.Dictations.createStore('+JSON.stringify(db)+')});';
+  const page=html.replace('<head>','<head><base href="'+base+'">').replace('<script src="./dictation-store.js" defer><'+'/script>','<script src="./dictation-store.js"><'+'/script><script>'+code+'<'+'/script>');
+  document.open();document.write(page);document.close();
+})();
+</script></html>

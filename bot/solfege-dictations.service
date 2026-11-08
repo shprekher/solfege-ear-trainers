@@ -1,0 +1,26 @@
+[Unit]
+Description=Private Solfege Telegram dictation importer
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=solfege-bot
+Group=solfege-bot
+WorkingDirectory=/opt/solfege-ear-trainers/bot
+EnvironmentFile=/etc/solfege-dictations.env
+Environment=PYTHONUNBUFFERED=1
+ExecStart=/usr/bin/python3 /opt/solfege-ear-trainers/bot/dictation_bot.py
+Restart=on-failure
+RestartSec=10
+StateDirectory=solfege-dictations
+StateDirectoryMode=0700
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=strict
+ReadWritePaths=/var/lib/solfege-dictations
+
+[Install]
+WantedBy=multi-user.target
