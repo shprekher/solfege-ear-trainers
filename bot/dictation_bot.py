@@ -1,5 +1,6 @@
 """Private Telegram importer. Python 3.9+, standard library only; no web server."""
 import hashlib
+import http.client
 import io
 import json
 import os
@@ -99,6 +100,30 @@ def make_parts(collection, tasks, assets, directory, limit=MAX_PART):
     return paths
 
 
+class TelegramFailure(RuntimeError):
+    def __init__(self, message, code, retryable=False, retry_after=None):
+        super().__init__(message)
+        self.code, self.retryable, self.retry_after = code, retryable, retry_after
+
+
+def safe_failure(error):
+    """Diagnostics must never stringify urllib exceptions (their URL includes the token)."""
+    if isinstance(error, TelegramFailure):
+        return error
+    if isinstance(error, urllib.error.HTTPError):
+        after = None
+        if error.code == 429:
+            try:
+                after = float(json.load(error).get('parameters', {}).get('retry_after', 2))
+            except Exception:
+                after = 2
+        return TelegramFailure('Telegram временно отклонил запрос. Попробуйте /retry.',
+                               f'HTTP_{error.code}', error.code == 429 or error.code >= 500, after)
+    reason = type(error.reason).__name__ if isinstance(error, urllib.error.URLError) else type(error).__name__
+    return TelegramFailure('Не удалось получить запись из Telegram. Попробуйте /retry.',
+                           'NETWORK_' + reason, isinstance(error, (OSError, urllib.error.URLError, http.client.HTTPException)))
+
+
 class Telegram:
     def __init__(self, token):
         self.token = token
@@ -116,17 +141,25 @@ class Telegram:
             raw, content_type = body.getvalue(), 'multipart/form-data; boundary=' + boundary
         else:
             raw, content_type = json.dumps(data or {}).encode(), 'application/json'
-        request = urllib.request.Request(f'https://api.telegram.org/bot{self.token}/{method}', data=raw,
-                                         headers={'Content-Type': content_type})
-        try:
-            with urllib.request.urlopen(request, timeout=180 if document else 55) as response:
-                result = json.load(response)
-        except (OSError, ValueError, urllib.error.URLError):
-            # Never leak an exception URL containing the token into logs or chat.
-            raise RuntimeError('Telegram временно недоступен. Повторите команду позже.') from None
-        if not result.get('ok'):
-            raise RuntimeError('Telegram отклонил запрос. Проверьте доступ бота и размер файла.')
-        return result['result']
+        attempts = 4 if method in ('getFile', 'getUpdates', 'getMe') else 2
+        for attempt in range(attempts):
+            try:
+                request = urllib.request.Request(f'https://api.telegram.org/bot{self.token}/{method}', data=raw,
+                                                 headers={'Content-Type': content_type})
+                with urllib.request.urlopen(request, timeout=180 if document else 55) as response:
+                    result = json.load(response)
+                if not result.get('ok'):
+                    code = result.get('error_code', 0)
+                    raise TelegramFailure('Telegram отклонил запрос. Повторите команду позже.', f'API_{code}',
+                                          code == 429 or code >= 500, result.get('parameters', {}).get('retry_after'))
+                return result['result']
+            except (OSError, ValueError, urllib.error.URLError, http.client.HTTPException, TelegramFailure) as error:
+                failure = safe_failure(error)
+            delay = failure.retry_after if failure.retry_after is not None else 2 ** attempt
+            if not failure.retryable or attempt == attempts - 1 or delay > 30:
+                raise failure from None
+            print(f'Telegram operation={method} code={failure.code} retry={attempt + 1}', flush=True)
+            time.sleep(max(1, delay))
 
     def reply(self, chat, text):
         return self.call('sendMessage', {'chat_id': chat, 'text': text})
@@ -135,28 +168,40 @@ class Telegram:
         info = self.call('getFile', {'file_id': file_id})
         remote = info.get('file_path', '')
         if not remote or '..' in remote or remote.startswith('/'):
-            raise RuntimeError('Telegram не предоставил запись для скачивания.')
+            raise TelegramFailure('Telegram не предоставил запись для скачивания.', 'MISSING_FILE_PATH')
+        if info.get('file_size', 0) > MAX_AUDIO:
+            raise TelegramFailure('Запись больше 20 МБ.', 'FILE_TOO_LARGE')
         temp = path.with_suffix('.partial')
-        try:
-            with urllib.request.urlopen(f'https://api.telegram.org/file/bot{self.token}/{remote}', timeout=90) as response, temp.open('wb') as out:
-                count = 0
-                while True:
-                    block = response.read(256 * 1024)
-                    if not block:
-                        break
-                    count += len(block)
-                    if count > MAX_AUDIO:
-                        raise ValueError('Запись больше 20 МБ. Пришлите более короткий файл.')
-                    out.write(block)
-            temp.replace(path)
-        except Exception:
-            temp.unlink(missing_ok=True)
-            raise RuntimeError('Не удалось скачать запись (лимит 20 МБ). Условие сохранено; перешлите аудио ещё раз.') from None
+        for attempt in range(3):
+            try:
+                with urllib.request.urlopen(f'https://api.telegram.org/file/bot{self.token}/{remote}', timeout=90) as response, temp.open('wb') as out:
+                    count = 0
+                    while True:
+                        block = response.read(256 * 1024)
+                        if not block:
+                            break
+                        count += len(block)
+                        if count > MAX_AUDIO:
+                            raise TelegramFailure('Запись больше 20 МБ.', 'FILE_TOO_LARGE')
+                        out.write(block)
+                if count == 0 or (info.get('file_size') and count != info['file_size']):
+                    raise TelegramFailure('Запись скачалась не полностью.', 'INCOMPLETE_FILE', True)
+                temp.replace(path)
+                return
+            except Exception as error:
+                temp.unlink(missing_ok=True)
+                failure = safe_failure(error)
+            delay = failure.retry_after if failure.retry_after is not None else 2 ** attempt
+            if not failure.retryable or attempt == 2 or delay > 30:
+                raise failure from None
+            print(f'Telegram operation=download code={failure.code} retry={attempt + 1}', flush=True)
+            time.sleep(max(1, delay))
 
 
 HELP = ('Перешлите условия и записи в исходном порядке: текст → аудио. Поддерживаются музыка и голосовые Telegram.\n\n'
         '/new описание — новое занятие (описание необязательно)\n/title описание — изменить описание текущего занятия\n'
         '/status — сколько сообщений получено\n/done — собрать файл(ы) для раздела «Диктанты»\n'
+        '/retry — повторить загрузку недоступных записей без повторной пересылки\n'
         '/last — повторно получить последнее готовое занятие\n/cancel — отменить черновик\n'
         '/id — узнать свой Telegram ID\n/purge YES — удалить все свои файлы и черновики с компьютера бота\n\n'
         'Оригинальный текст и порядок сохраняются. При первом сообщении занятие создаётся автоматически. '
@@ -192,11 +237,48 @@ class Bot:
     def messages(self, batch):
         return [json.loads(row[0]) for row in self.db.execute('SELECT payload FROM messages WHERE batch=? ORDER BY mid', (batch,))]
 
+    def legacy_gap(self, row):
+        return bool(self.db.execute('SELECT 1 FROM settings WHERE key=?', ('needs_reforward:' + row[0],)).fetchone())
+
+    def legacy_notice(self, user):
+        self.api.reply(user, 'В этом старом черновике часть аудио не была сохранена прежней версией бота. Чтобы не связать условия с чужими записями, набор не собирается. Отправьте /cancel, затем /new и перешлите исходный набор заново в порядке текст → аудио. Старые сохранённые файлы не удаляются.')
+
+    def download_saved(self, user, payload):
+        try:
+            self.api.download(payload['file_id'], Path(payload['path']))
+            payload['downloadState'] = 'ready'
+            payload.pop('downloadError', None)
+            success = True
+        except Exception as error:
+            failure = safe_failure(error)
+            payload.update(downloadState='failed', downloadError=failure.code)
+            print(f'Audio mid={payload["message_id"]} code={failure.code}; metadata preserved', flush=True)
+            success = False
+        self.db.execute('UPDATE messages SET payload=? WHERE user=? AND mid=?', (json.dumps(payload, ensure_ascii=False), user, payload['message_id']))
+        self.db.commit()
+        return success
+
+    def retry(self, user, row):
+        pending = [m for m in self.messages(row[0]) if m['kind'] == 'audio' and
+                   (m.get('downloadState', 'ready') != 'ready' or not Path(m['path']).is_file())]
+        for payload in pending:
+            if payload.get('file_id'):
+                self.download_saved(user, payload)
+        return len([m for m in self.messages(row[0]) if m['kind'] == 'audio' and
+                    (m.get('downloadState', 'ready') != 'ready' or not Path(m['path']).is_file())])
+
     def export(self, user, row):
+        if self.legacy_gap(row):
+            self.legacy_notice(user)
+            return
         messages = self.messages(row[0])
         if not messages:
             self.api.reply(user, 'Пока нет сообщений. Перешлите текст и аудио.')
             return
+        if self.retry(user, row):
+            self.api.reply(user, 'Не все записи скачаны. Их места и условия сохранены. Повторите /retry, затем /done; повторно пересылать сообщения не нужно.')
+            return
+        messages = self.messages(row[0])
         tasks = pair_messages(messages, row[0])
         assets = {f'audio-{m["message_id"]}': m for m in messages if m['kind'] == 'audio'}
         collection = {'id': row[0], 'receivedAt': row[2], 'day': row[3], 'description': row[4]}
@@ -224,6 +306,7 @@ class Bot:
             self.api.reply(user, 'Доступ не настроен. Узнайте ID командой /id и добавьте его в TELEGRAM_ALLOWED_USER_IDS на компьютере бота.')
             return
         mid = message['message_id']
+        pending_download = None
         if self.db.execute('SELECT 1 FROM seen WHERE user=? AND mid=?', (user, mid)).fetchone():
             return
         if command in ('/start', '/help'):
@@ -241,7 +324,20 @@ class Bot:
         elif command == '/status':
             row = self.active(user)
             items = self.messages(row[0]) if row else []
-            self.api.reply(user, f'Получено: текстов — {sum(m["kind"] == "text" for m in items)}, записей — {sum(m["kind"] == "audio" for m in items)}.')
+            waiting = sum(m['kind'] == 'audio' and m.get('downloadState', 'ready') != 'ready' for m in items)
+            self.api.reply(user, f'Получено: текстов — {sum(m["kind"] == "text" for m in items)}, записей — {sum(m["kind"] == "audio" for m in items)}. Ожидают загрузки: {waiting}.' + (' Повторите /retry.' if waiting else ''))
+            if row and self.legacy_gap(row):
+                self.legacy_notice(user)
+        elif command == '/retry':
+            row = self.active(user)
+            if row:
+                if self.legacy_gap(row):
+                    self.legacy_notice(user)
+                else:
+                    waiting = self.retry(user, row)
+                    self.api.reply(user, f'Ожидают загрузки: {waiting}. ' + ('Попробуйте /retry позже.' if waiting else 'Все сохранённые записи доступны. Можно отправить /done.'))
+            else:
+                self.api.reply(user, 'Нет открытого набора.')
         elif command == '/done':
             row = self.active(user)
             self.export(user, row) if row else self.api.reply(user, 'Нет открытого набора. Перешлите сообщения или отправьте /new.')
@@ -278,24 +374,30 @@ class Bot:
                 directory = self.root / str(user) / row[0]
                 directory.mkdir(parents=True, exist_ok=True)
                 path = directory / f'audio-{mid}.bin'
-                self.api.download(audio['file_id'], path)
                 original = audio.get('file_name', '')
                 mime = (audio.get('mime_type') or '').split(';', 1)[0].strip().lower()
                 if not mime.startswith('audio/'):
                     mime = 'audio/ogg' if 'voice' in message else MIMES.get(Path(original).suffix.lower(), 'audio/mpeg')
                 payload.update(kind='audio', path=str(path), mime=mime, originalName=original, duration=audio.get('duration', 0))
+                payload.update(file_id=audio['file_id'], downloadState='pending')
                 payload['source']['media'] = {key: audio[key] for key in ('file_unique_id', 'file_name', 'title', 'performer', 'duration', 'mime_type', 'file_size') if key in audio}
                 # A caption is additional literal source text; never overwrite a separate condition.
                 if message.get('caption'):
                     payload['caption'] = message['caption']
+                pending_download = payload
             if not self.db.execute('SELECT 1 FROM messages WHERE batch=? LIMIT 1', (row[0],)).fetchone():
                 received = datetime.fromtimestamp(message.get('date', time.time()), timezone.utc)
                 self.db.execute('UPDATE batches SET received=?,day=? WHERE id=?', (received.isoformat(), received.astimezone(self.zone).date().isoformat(), row[0]))
             self.db.execute('INSERT INTO messages VALUES(?,?,?,?)', (user, mid, row[0], json.dumps(payload, ensure_ascii=False)))
         self.db.execute('INSERT OR IGNORE INTO seen VALUES(?,?)', (user, mid))
         self.db.commit()
+        if pending_download and not self.download_saved(user, pending_download):
+            self.api.reply(user, 'Не удалось скачать аудио после повторных попыток. Условие, запись и её место сохранены. Отправьте /retry — пересылать заново не нужно.')
 
     def run(self):
+        for row in self.db.execute("SELECT * FROM batches WHERE status='open'").fetchall():
+            if row[1] in self.allowed:
+                self.retry(row[1], row)
         stored = self.db.execute("SELECT value FROM settings WHERE key='offset'").fetchone()
         offset = int(stored[0]) if stored else 0
         while True:
@@ -305,9 +407,10 @@ class Bot:
                     try:
                         if 'message' in update:
                             self.handle(update['message'])
-                    except Exception:
+                    except Exception as error:
                         # Keep original pending texts on failure. Never log recordings, text, token or URLs.
                         self.db.rollback()
+                        print(f'Update processing failed code={safe_failure(error).code}', flush=True)
                         chat = update.get('message', {}).get('chat', {})
                         if chat.get('type') == 'private':
                             self.api.reply(chat['id'], 'Не удалось обработать сообщение. Перешлите его ещё раз или повторите команду. Уже принятые условия сохранены.')

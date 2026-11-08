@@ -1,10 +1,14 @@
 import hashlib
+import http.client
+import io
 import json
+import urllib.error
 from pathlib import Path
 import struct
 import tempfile
 import unittest
-from dictation_bot import Bot, MAGIC, make_parts, pair_messages
+from unittest.mock import patch
+from dictation_bot import Bot, Telegram, MAGIC, make_parts, pair_messages
 
 
 class FakeTelegram:
@@ -79,9 +83,58 @@ class DictationTests(unittest.TestCase):
 
     def test_failed_audio_does_not_consume_condition(self):
         self.bot.handle(message(1, text='Условие'))
-        with self.assertRaises(RuntimeError):
-            self.bot.handle(message(2, audio={'file_id': 'broken'}))
-        self.assertEqual(len(self.bot.messages(self.bot.active(1)[0])), 1)
+        self.bot.handle(message(2, audio={'file_id': 'broken'}))
+        self.bot.handle(message(3, text='Следующее условие'))
+        self.bot.handle(message(4, audio={'file_id': 'good'}))
+        items = self.bot.messages(self.bot.active(1)[0])
+        self.assertEqual(len(items), 4)
+        self.assertEqual(items[1]['downloadState'], 'failed')
+        tasks = pair_messages(items, 'collection')
+        self.assertEqual([t['audioSource']['message_id'] for t in tasks], [2, 4])
+        self.bot.handle(message(5, text='/done'))
+        self.assertFalse(self.api.sent)
+        self.api.download = lambda file_id, path: path.write_bytes(b'recovered')
+        self.bot.handle(message(6, text='/retry'))
+        self.assertEqual(self.bot.messages(self.bot.active(1)[0])[1]['downloadState'], 'ready')
+        self.bot.handle(message(7, text='/done'))
+        self.assertEqual(len(self.api.sent), 1)
+
+    def test_api_retries_without_logging_token(self):
+        secret = '123456:fake_secret_must_not_appear'
+        result = io.BytesIO(json.dumps({'ok': True, 'result': {'file_path': 'voice/a.ogg'}}).encode())
+        output = io.StringIO()
+        with patch('dictation_bot.urllib.request.urlopen', side_effect=[urllib.error.URLError('https://api.telegram.org/bot' + secret), result]) as request, patch('dictation_bot.time.sleep'), patch('sys.stdout', output):
+            self.assertEqual(Telegram(secret).call('getFile', {'file_id': 'one'})['file_path'], 'voice/a.ogg')
+            self.assertEqual(request.call_count, 2)
+        self.assertNotIn(secret, output.getvalue())
+
+    def test_http_429_respects_retry_after(self):
+        error = urllib.error.HTTPError('https://api.telegram.org/botSECRET', 429, 'rate limit', {}, io.BytesIO(b'{"parameters":{"retry_after":2}}'))
+        result = io.BytesIO(b'{"ok":true,"result":{}}')
+        with patch('dictation_bot.urllib.request.urlopen', side_effect=[error, result]), patch('dictation_bot.time.sleep') as sleep:
+            Telegram('SECRET').call('getFile')
+            sleep.assert_called_once_with(2)
+
+    def test_partial_download_is_retried_without_concatenation(self):
+        class Broken(io.BytesIO):
+            def read(self, *args):
+                raise http.client.IncompleteRead(b'ab', 6)
+        api = Telegram('SECRET')
+        api.call = lambda *args, **kwargs: {'file_path': 'voice/test.ogg', 'file_size': 6}
+        path = Path(self.temp.name) / 'retry.bin'
+        with patch('dictation_bot.urllib.request.urlopen', side_effect=[Broken(), io.BytesIO(b'abcdef')]), patch('dictation_bot.time.sleep'):
+            api.download('file-id', path)
+        self.assertEqual(path.read_bytes(), b'abcdef')
+        self.assertFalse(path.with_suffix('.partial').exists())
+
+    def test_legacy_gap_is_not_exported_with_shifted_pairs(self):
+        self.bot.handle(message(1, text='Условие'))
+        row = self.bot.active(1)
+        self.bot.db.execute('INSERT INTO settings VALUES(?,?)', ('needs_reforward:' + row[0], '1'))
+        self.bot.db.commit()
+        self.bot.handle(message(2, text='/done'))
+        self.assertFalse(self.api.sent)
+        self.assertIn('перешлите исходный набор заново', self.api.replies[-1][1])
 
     def test_allowlist_and_groups(self):
         self.bot.handle({'message_id': 1, 'from': {'id': 2}, 'chat': {'id': 2, 'type': 'private'}, 'voice': {'file_id': 'x'}})
