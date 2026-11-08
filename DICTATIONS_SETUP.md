@@ -34,7 +34,7 @@ python3 bot/dictation_bot.py
 ```sh
 export TELEGRAM_ALLOWED_USER_IDS='123456789'
 export DICTATION_TIMEZONE='Europe/Moscow'
-export DICTATION_SITE_URL='https://solfege-ear-trainers.tuqo.ru/dictations.html'
+export DICTATION_SITE_URL='https://solfeggio.tuqo.ru/dictations.html'
 python3 bot/dictation_bot.py
 ```
 

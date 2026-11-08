@@ -71,10 +71,11 @@ python3 -m http.server 8000
 ### Адреса сайта
 
 - Исходники: https://github.com/shprekher/solfege-ear-trainers
-- Главная: https://solfege-ear-trainers.tuqo.ru/
-- «Выше или ниже?»: https://solfege-ear-trainers.tuqo.ru/half-step.html
-- «Сколько нот?»: https://solfege-ear-trainers.tuqo.ru/count-notes.html
-- «Какой голос изменился?»: https://solfege-ear-trainers.tuqo.ru/shifted-voice.html
+- Главная: https://solfeggio.tuqo.ru/
+- «Выше или ниже?»: https://solfeggio.tuqo.ru/half-step.html
+- «Сколько нот?»: https://solfeggio.tuqo.ru/count-notes.html
+- «Какой голос изменился?»: https://solfeggio.tuqo.ru/shifted-voice.html
+- Диктанты: https://solfeggio.tuqo.ru/dictations.html
 
 Tuqo Git CD подключён к публичному HTTPS-адресу репозитория и ветке `main`; вебхук GitHub передаёт события `push`. Сборка и npm не нужны. Секрет вебхука хранится в настройках сервисов, не в репозитории.
 
