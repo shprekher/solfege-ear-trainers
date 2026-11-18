@@ -22,7 +22,7 @@
       doc.getElementById('start').click(); await wait(readyForAnswer);
       if (exercise === 'shifted-voice') { doc.querySelector('[data-voice="1"]').click(); doc.querySelector('[data-direction="1"]').click(); }
       else if (exercise === 'half-step') doc.querySelector('[data-direction="1"]').click();
-      else if (exercise === 'note-reading') doc.querySelector('[data-letter="C"]').click();
+      else if (exercise === 'note-reading') doc.querySelector('[data-letter="B"]').click();
       else [...doc.querySelectorAll('.choice')].filter(b => !b.disabled).at(-1).click();
       await wait(async () => (await store.list()).filter(a => a.exercise === exercise).length === 1);
       const first = (await store.list()).find(a => a.exercise === exercise);
