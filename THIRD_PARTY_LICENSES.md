@@ -1,6 +1,8 @@
 # Сторонние ресурсы и лицензии
 
-Во всех HTML-тренажёрах встроены сэмплы акустического пианино, полученные из SoundFont **TimGM6mb** (авторы Tim Brechbill и David Bolton), обозначенного в исходных файлах как **GNU GPL version 2**.
+Нотная аркада `note-shooter.html` не содержит сторонних сэмплов или библиотек: выстрел и взрыв синтезируются локально средствами Web Audio. Лицензии и встроенные сэмплы сохранённых упражнений и прототипа не изменены.
+
+В сохранённых HTML-тренажёрах и прототипе `play-the-note.html` встроены сэмплы акустического пианино, полученные из SoundFont **TimGM6mb** (авторы Tim Brechbill и David Bolton), обозначенного в исходных файлах как **GNU GPL version 2**.
 
 - Источник: https://www.timbrechbill.com/soundfonts/
 - GNU GPL v2: https://www.gnu.org/licenses/old-licenses/gpl-2.0.html
@@ -11,7 +13,7 @@
 
 ## Электронное звучание
 
-В HTML-тренажёрах, кроме `play-the-note.html`, встроены сэмплы электрического пианино, отрендеренные из SoundFont **FluidR3_GM** (GM-программа 5, «Legend EP 2») автора **Frank Wen**.
+В сохранённых HTML-тренажёрах, кроме `play-the-note.html` и новой аркады `note-shooter.html`, встроены сэмплы электрического пианино, отрендеренные из SoundFont **FluidR3_GM** (GM-программа 5, «Legend EP 2») автора **Frank Wen**.
 
 - Источник и условия: https://member.keymusician.com/Member/FluidR3_GM/README.html
 - Лицензия: **MIT**. Copyright (c) 2000-2002, 2008 Frank Wen.

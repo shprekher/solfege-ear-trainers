@@ -7,8 +7,8 @@
   const assert = (ok, message) => { if (!ok) throw new Error(message); };
   const wait = async fn => { const start = performance.now(); while (!(await fn())) { if (performance.now() - start > 15000) throw new Error('Истекло время ожидания'); await new Promise(resolve => setTimeout(resolve, 30)); } };
   // Microphone lifecycle and one-verdict-per-card integration use safe mocks
-  // in pitch-tests.html, not this replay-button harness.
-  const files = Object.keys(P.EXERCISES).filter(id => id !== 'play-the-note');
+  // in pitch-tests.html / note-shooter-tests.html, not this replay harness.
+  const files = Object.keys(P.EXERCISES).filter(id => !['play-the-note', 'note-shooter'].includes(id));
   await Promise.all(files.map(async exercise => {
     const frame = document.createElement('iframe'); frame.style.cssText = 'width:432px;height:934px;border:0';
     let doc;

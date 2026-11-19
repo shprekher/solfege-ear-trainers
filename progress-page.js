@@ -6,6 +6,7 @@
   const percent = rows => rows.length ? Math.round(rows.filter(a => a.correct).length / rows.length * 100) + '%' : '—';
   function status(text, error = false) { $('status').textContent = text; $('status').classList.toggle('error', error); }
   function modeLabel(mode, exercise) {
+    if (exercise === 'note-shooter') return (mode.clef === 'bass' ? 'Басовый ключ' : 'Скрипичный ключ') + ' · ' + mode.direction;
     if (exercise === 'play-the-note') return mode.direction;
     const parts = [];
     if (mode.voices) parts.push(mode.voices + ' голоса');
@@ -17,6 +18,7 @@
     return parts.join(' · ');
   }
   function taskLabel(answer) {
+    if (answer.exercise === 'note-shooter') return 'Сыграть: ' + answer.expected;
     if (answer.exercise === 'play-the-note') return 'Сыграть: ' + answer.expected;
     if (answer.exercise === 'half-step') return answer.task === 'up' ? 'Второй звук выше' : 'Второй звук ниже';
     if (answer.exercise === 'count-notes') return answer.expected + ' ноты';
@@ -89,7 +91,7 @@
     const best30 = rows.length >= 30 ? Math.round(bestWindow / 30 * 100) + '%' : 'пока меньше 30 ответов';
     $('records').textContent = rows.length ? 'В этом режиме: рекорд последних 30 — ' + best30 + '; лучшая серия в тренировке — ' + s.bestRun + '. Всего ответов: ' + rows.length + '.' : '';
     const groups = new Map();
-    for (const a of rows) { const group = groups.get(a.task) || { sample: a, rows: [], mistakes: new Map() }; group.rows.push(a); if (!a.correct) group.mistakes.set(a.actual, (group.mistakes.get(a.actual) || 0) + 1); groups.set(a.task, group); }
+    for (const a of rows) { const task = a.exercise === 'note-shooter' ? a.task.split(':')[0] : a.task; const group = groups.get(task) || { sample: a, rows: [], mistakes: new Map() }; group.rows.push(a); if (!a.correct) group.mistakes.set(a.actual, (group.mistakes.get(a.actual) || 0) + 1); groups.set(task, group); }
     const groupsSorted = [...groups.values()].sort((a, b) => b.rows.filter(r => !r.correct).length - a.rows.filter(r => !r.correct).length);
     const errorRows = groupsSorted.map(g => [taskLabel(g.sample), g.rows.length, g.rows.filter(a => !a.correct).length, percent(g.rows), [...g.mistakes.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] || '—']);
     $('errors').replaceChildren(errorRows.length ? table(['Задание', 'Ответы', 'Ошибки', 'Точность', 'Частая ошибка'], errorRows) : el('p', 'Истории пока нет.', 'empty'));

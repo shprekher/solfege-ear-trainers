@@ -1,6 +1,11 @@
 {
   "project": "Тренажёры музыкального слуха",
   "exercise_sources": {
+    "note-shooter.html": {
+      "original": "new arcade exercise based on play-the-note.html",
+      "sha256_original": null,
+      "sha256_packaged": "d49d9f4c23308ff44e58dd0b5084a75ec75c9edfbd02937212cad7b1b82d7ee0"
+    },
     "play-the-note.html": {
       "original": "new microphone exercise based on note-reading.html",
       "sha256_original": null,

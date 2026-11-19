@@ -1,0 +1,353 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#10141a">
+<title>Сыграй ноту — нотная аркада</title>
+<style>
+:root{color-scheme:dark;--ink:#f1f4f6;--muted:#b4bec8;--accent:#b4dbca;--gold:#ffe0a1}
+*{box-sizing:border-box}html{min-height:100%;-webkit-text-size-adjust:100%}body{margin:0;padding:max(12px,env(safe-area-inset-top)) max(12px,env(safe-area-inset-right)) max(12px,env(safe-area-inset-bottom)) max(12px,env(safe-area-inset-left));font:15px/1.4 -apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif;color:var(--ink);background:radial-gradient(ellipse at 50% -20%,#25363a,transparent 52%),#10141a}
+main{width:min(100%,1080px);height:calc(100svh - max(12px,env(safe-area-inset-top)) - max(12px,env(safe-area-inset-bottom)));min-height:600px;margin:auto;display:flex;flex-direction:column;gap:12px}
+header{display:flex;align-items:center;justify-content:space-between;gap:12px;flex:none}h1{font-size:clamp(22px,4vw,30px);margin:0}a{color:var(--accent)}.back{font-size:13px;white-space:nowrap}
+.arena{display:flex;flex-direction:column;flex:1;min-height:0;background:linear-gradient(180deg,#1d2630,#171e26);border:1px solid #3c454d;border-radius:22px;overflow:hidden}
+.hud{display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:14px;padding:14px 16px;border-bottom:1px solid #38454e;flex:none}.hearts{white-space:nowrap;letter-spacing:3px;color:#f4a0b5;font-size:25px}.lost{color:#48505c}.tuner{justify-self:end;width:min(100%,230px);min-width:0}#heard{display:block;font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.meter{height:6px;background:#38454e;border-radius:4px;overflow:hidden;margin-top:7px}.meter span{display:block;height:100%;width:0;background:var(--accent)}
+button,select,input{font:inherit}button,select{min-height:44px;border:1px solid #45535f;border-radius:10px;padding:8px 12px;background:#111820;color:var(--ink)}button{cursor:pointer;touch-action:manipulation}button.primary{background:var(--accent);color:#122822;font-weight:750}button:disabled{opacity:.5;cursor:default}button:focus-visible,a:focus-visible,select:focus-visible{outline:2px solid white;outline-offset:3px}
+.stage{position:relative;flex:1;min-height:0;background:radial-gradient(ellipse at 15% 50%,#29423b55,transparent 55%);isolation:isolate}#staff{display:block;width:100%;height:100%;overflow:hidden;position:absolute;inset:0}.staff-lines{stroke:#8797a6;stroke-width:1.2}.answer-line{stroke:#ffe0a177;stroke-dasharray:5 7;stroke-width:1.5}.staff-key{font-family:Bravura,"Noto Music","Apple Symbols",serif;fill:#cbd7e0}.note{color:#f1f4f6}.note.doomed{color:#f4a0b5}.target-ring{fill:#ffe0a10d;stroke:var(--gold);stroke-width:2}.ship{fill:#b4dbca;stroke:#e4fff2;stroke-width:1.4}.shield{fill:none;stroke:#b4dbca44;stroke-width:1}
+.screen{position:absolute;z-index:2;inset:0;display:grid;place-items:center;padding:12px;background:#10141a99;backdrop-filter:blur(3px)}.screen[hidden]{display:none}.panel{width:min(100%,430px);max-height:100%;overflow:auto;overscroll-behavior:contain;background:linear-gradient(180deg,#202e38,#171e26);border:1px solid #53616b;border-radius:18px;padding:22px;box-shadow:0 15px 55px #0007}.panel h2{font-size:25px;margin:0 0 8px}.panel p{margin:8px 0;color:var(--muted)}.settings{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:18px 0}.settings label{display:flex;flex-direction:column;gap:5px;font-size:13px}.settings select{width:100%;min-width:0}.settings .wide{grid-column:1/-1}.check{display:block;font-size:14px;margin:12px 0}.actions{display:flex;gap:8px;margin-top:16px}.actions button{flex:1}.range-hint{font-size:12px;min-height:34px}.error{color:#ffb8bf!important}.error:empty{display:none}.result{font-size:17px!important;color:var(--ink)!important}.small{font-size:12px}
+.metrics{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:5px;text-align:center;flex:none}.metric b{display:block;font-size:26px}.metric span{font-size:10px;color:var(--muted)}.bottom{display:flex;justify-content:space-between;gap:12px;align-items:center;font-size:12px;color:var(--muted);flex:none}.bottom p{margin:0;max-width:75%}
+.stage.shake{animation:shake .4s ease-out}.stage.frozen{animation-play-state:paused}
+@keyframes shake{0%,100%{transform:translateX(0)}20%,60%{transform:translateX(-7px)}40%,80%{transform:translateX(6px)}}
+@media(max-width:420px){main{gap:8px;min-height:580px}.hud{gap:8px;padding:10px}.hearts{font-size:21px;letter-spacing:1px}.hud button{padding:7px 9px}#heard{font-size:12px}.panel{padding:16px}.panel h2{font-size:23px}.settings{gap:8px;margin:12px 0}.back{font-size:11px}.bottom{font-size:11px}}
+@media(prefers-reduced-motion:reduce){.stage.shake{animation:none}}
+</style>
+</head>
+<body><main>
+<header><h1>Сыграй ноту</h1><a class="back" href="./index.html">← К упражнениям</a></header>
+<section class="arena" aria-label="Нотная аркада">
+<div class="hud">
+ <div class="hearts" id="hearts" role="img" aria-label="Жизни: 3"><span>♥</span><span>♥</span><span>♥</span></div>
+ <div class="tuner"><span id="heard">Слышу: —</span><div class="meter" id="meter" role="meter" aria-label="Уровень микрофона" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><span id="level"></span></div></div>
+ <button id="pause" disabled aria-label="Пауза">Пауза</button>
+</div>
+<div class="stage" id="stage">
+ <svg id="staff" role="img" aria-label="Ноты движутся справа к линии ответа"><g id="background"></g><g id="notes"></g><g id="effects" aria-hidden="true"></g></svg>
+ <div class="screen" id="screen"><section class="panel" aria-labelledby="screenTitle">
+  <h2 id="screenTitle">Нотная аркада</h2>
+  <p id="screenText">Сыграйте ноту в кольце до пунктирной линии. Ошибка или пропуск — удар по кораблю. У вас три жизни.</p>
+  <p class="result" id="result" hidden></p>
+  <div id="settingsBox">
+   <div class="settings">
+    <label>Ключ<select id="clef"><option value="treble">Скрипичный</option><option value="bass">Басовый</option></select></label>
+    <label>Диапазон<select id="range"><option value="basic">Базовый</option><option value="extended">Расширенный</option></select></label>
+    <label class="wide">Темп, ударов в минуту<select id="bpm"><option>60</option><option>70</option><option selected>80</option><option>90</option><option>100</option><option>110</option><option>120</option><option>130</option><option>140</option><option>150</option><option>160</option></select></label>
+   </div>
+   <p class="range-hint" id="rangeHint"></p>
+   <label class="check"><input type="checkbox" id="sounds" checked> Звуки выстрелов и взрывов</label>
+   <p class="small">Играйте по одной ноте без педали. После выстрела отпустите клавишу и дайте звуку затихнуть. Микрофону нужен HTTPS или localhost.</p>
+  </div>
+  <p class="error" id="error" role="alert"></p>
+  <div class="actions"><button class="primary" id="start">Старт</button><button id="finish" hidden>Завершить</button></div>
+ </section></div>
+</div>
+</section>
+<div class="metrics" aria-label="Статистика">
+ <div class="metric"><b id="answers">0</b><span>ОТВЕТОВ</span></div><div class="metric"><b id="streak">0</b><span>СЕРИЯ</span></div><div class="metric"><b id="accuracy">—</b><span>ТОЧНОСТЬ</span></div><div class="metric"><b id="best">0</b><span>РЕКОРД</span></div>
+</div>
+<div class="bottom"><p id="hint" role="status">Играйте левую ноту в кольце. Нужна та же октава.</p><a href="./progress.html">Мой прогресс</a></div>
+</main>
+<script src="./pitch-detector.js"></script><script src="./progress-store.js"></script>
+<script>
+(() => {
+'use strict';
+// MIDI limits, geometry and beat timing live in this one immutable config.
+const CONFIG = Object.freeze({
+ ranges: Object.freeze({
+  treble: Object.freeze({basic:Object.freeze([60,71]),extended:Object.freeze([57,84])}),
+  bass: Object.freeze({basic:Object.freeze([43,57]),extended:Object.freeze([40,60])})
+ }),
+ shipX:.12, lineX:.38, spawnX:.95, travelBeats:8, spawnBeats:2,
+ doomSeconds:.6, cooldownMs:700, lives:3, minBpm:60, maxBpm:160, bpmStep:10
+});
+const natural=[0,2,4,5,7,9,11], syllables=['до','ре','ми','фа','соль','ля','си'];
+const noteName = midi => {
+ const pc=((midi%12)+12)%12, index=natural.indexOf(pc);
+ if(index>=0)return syllables[index]+' ('+(Math.floor(midi/12)-1)+')';
+ const lower=natural.filter(n=>n<pc).pop();
+ return syllables[natural.indexOf(lower)]+'♯ ('+(Math.floor(midi/12)-1)+')';
+};
+function diatonic(midi) { return (Math.floor(midi/12)-1)*7+natural.indexOf(midi%12); }
+function noteSteps(midi,clef) { return diatonic(midi)-(clef==='treble'?4*7+2:2*7+4); }
+function createGame(settings, {random=Math.random,onVerdict=()=>{},onCollision=()=>{},best=0}={}) {
+ const range=CONFIG.ranges[settings.clef]?.[settings.range];
+ if(!range||!Number.isInteger(settings.bpm)||settings.bpm<CONFIG.minBpm||settings.bpm>CONFIG.maxBpm||settings.bpm%CONFIG.bpmStep)throw Error('Неверные настройки игры');
+ const pool=[];for(let n=range[0];n<=range[1];n++)if(natural.includes(n%12))pool.push(n);
+ const beat=60/settings.bpm, interval=CONFIG.spawnBeats*beat;
+ const game={settings:Object.freeze({...settings}),phase:'running',time:0,notes:[],lives:CONFIG.lives,answers:0,correct:0,streak:0,best,spawnIn:interval};
+ let previous=null, serial=0;
+ function spawn(){
+  const candidates=pool.filter(n=>n!==previous),midi=candidates[Math.min(candidates.length-1,Math.floor(random()*candidates.length))];previous=midi;
+  game.notes.push({id:++serial,midi,x:CONFIG.spawnX,speed:(CONFIG.spawnX-CONFIG.lineX)/(CONFIG.travelBeats*beat),state:'moving',age:0,doomAge:0});
+ }
+ game.target=()=>game.notes.filter(n=>n.state==='moving').reduce((left,n)=>!left||n.x<left.x?n:left,null);
+ function resolve(note,outcome,actual=null){
+  if(game.phase!=='running'||note.state!=='moving')return null;
+  note.outcome=outcome;note.actual=actual;note.verdictAt=game.time;
+  game.answers++;
+  if(outcome==='correct'){note.state='hit';note.hitAge=0;game.correct++;game.streak++;game.best=Math.max(game.best,game.streak);}
+  else{note.state='doomed';note.doomAge=0;note.speed=(note.x-CONFIG.shipX)/CONFIG.doomSeconds;game.streak=0;}
+  const event={note,outcome,actual,at:game.time};
+  onVerdict(event,game);return event;
+ }
+ game.answer=(midi,cents=0)=>{
+  const target=game.target();
+  if(game.phase!=='running'||!target)return null;
+  return resolve(target,midi===target.midi&&Math.abs(cents)<=50?'correct':'wrong',midi);
+ };
+ game.pause=()=>{if(game.phase==='running')game.phase='paused';};
+ game.resume=()=>{if(game.phase==='paused')game.phase='running';};
+ game.finish=()=>{game.phase='over';};
+ game.advance=dt=>{
+  if(game.phase!=='running'||!Number.isFinite(dt)||dt<=0)return;
+  let remaining=dt;
+  // Small deterministic slices preserve spawn/crossing/collision order even
+  // when a slow frame contains several beats. No speed is shared by notes.
+  while(remaining>1e-9&&game.phase==='running'){
+   if(game.spawnIn<=1e-9){spawn();game.spawnIn+=interval;}
+   const step=Math.min(remaining,1/60,game.spawnIn);
+   game.time+=step;game.spawnIn-=step;remaining-=step;
+   for(const note of game.notes){
+    note.age+=step;
+    if(note.state==='moving'){
+     note.x-=note.speed*step;
+     if(note.x<=CONFIG.lineX+1e-10){note.x=CONFIG.lineX;resolve(note,'timeout');}
+    }else if(note.state==='doomed'){
+     note.x-=note.speed*step;note.doomAge+=step;
+     if(note.doomAge>=CONFIG.doomSeconds-1e-9){
+      note.x=CONFIG.shipX;note.state='gone';game.lives=Math.max(0,game.lives-1);
+      if(game.lives===0)game.phase='over';
+      onCollision({note,at:game.time},game);
+      if(game.phase==='over')break;
+     }
+    }else if(note.state==='hit'){note.hitAge+=step;if(note.hitAge>=.35)note.state='gone';}
+   }
+   game.notes=game.notes.filter(n=>n.state!=='gone');
+  }
+  if(game.phase==='running'&&game.spawnIn<=1e-9){spawn();game.spawnIn+=interval;}
+ };
+ spawn();return game;
+}
+window.NoteShooter=Object.freeze({CONFIG,createGame,noteName,noteSteps});
+
+const $=id=>document.getElementById(id), P=window.PitchDetector, progress=window.SolfegeProgress.tracker('note-shooter');
+const settingsKey='solfege-note-shooter-settings',bestKey='solfege-note-shooter-best';
+let allTimeBest=0;
+try{
+ const saved=JSON.parse(localStorage.getItem(settingsKey)||'{}');
+ if(['treble','bass'].includes(saved.clef))$('clef').value=saved.clef;
+ if(['basic','extended'].includes(saved.range))$('range').value=saved.range;
+ if(Number.isInteger(saved.bpm)&&saved.bpm>=60&&saved.bpm<=160&&saved.bpm%10===0)$('bpm').value=saved.bpm;
+ if(typeof saved.sounds==='boolean')$('sounds').checked=saved.sounds;
+ const best=Number(localStorage.getItem(bestKey));if(Number.isSafeInteger(best)&&best>=0)allTimeBest=best;
+}catch{}
+const readSettings=()=>({clef:$('clef').value,range:$('range').value,bpm:+$('bpm').value});
+function rangeHint(){
+ const s=readSettings(),[low,high]=CONFIG.ranges[s.clef][s.range];
+ $('rangeHint').textContent=`${noteName(low)} — ${noteName(high)}. До линии: ${(8*60/s.bpm).toFixed(1).replace('.',',')} с. Новая нота каждые ${(2*60/s.bpm).toFixed(2).replace('.',',')} с.`;
+}
+for(const id of ['clef','range','bpm','sounds'])$(id).addEventListener('change',()=>{
+ try{localStorage.setItem(settingsKey,JSON.stringify({...readSettings(),sounds:$('sounds').checked}));}catch{}
+ rangeHint();if(!game){layout();render();}
+});
+let game=null,view='start',frame=0,lastFrame=null,generation=0,context=null,stream=null,source=null,analyser=null;
+let buffer,detect,stable=P.stability(),attack=P.onset(),noise=P.noiseFloor(),muteUntil=0,lastLevel=0;
+let fx=[],noteNodes=new Map(),audioNodes=new Set(),geometry={width:1,height:1},effectQuietUntil=0;
+const svgNS='http://www.w3.org/2000/svg';
+function svg(tag,attrs){const node=document.createElementNS(svgNS,tag);for(const [key,value]of Object.entries(attrs||{}))node.setAttribute(key,value);return node;}
+function stats(){
+ const g=game;$('answers').textContent=g?.answers||0;$('streak').textContent=g?.streak||0;
+ $('accuracy').textContent=g?.answers?Math.round(g.correct/g.answers*100)+'%':'—';$('best').textContent=allTimeBest;
+ $('hearts').replaceChildren(...Array.from({length:3},(_,i)=>{const el=document.createElement('span');el.textContent='♥';el.className=i<(g?.lives??3)?'':'lost';return el;}));
+ $('hearts').setAttribute('aria-label','Жизни: '+(g?.lives??3));
+}
+function saveBest(){
+ if(game.best<=allTimeBest)return;allTimeBest=game.best;
+ try{localStorage.setItem(bestKey,String(allTimeBest));}catch{$('hint').textContent='Рекорд не сохранится после закрытия: локальное хранилище недоступно.';}
+}
+function blockMic(){
+ const now=(game?.time||0)*1000;
+ muteUntil=Math.max(muteUntil,now+CONFIG.cooldownMs);attack.block(now,Math.max(lastLevel,.003),muteUntil-now);stable.reset();
+}
+function playSound(kind){
+ // Only locally synthesized effects reach destination, never the mic source.
+ if(!$('sounds').checked||!context||context.state!=='running')return;
+ effectQuietUntil=performance.now()+CONFIG.cooldownMs;
+ const ctx=context,osc=ctx.createOscillator(),gain=ctx.createGain(),now=ctx.currentTime;
+ const duration=kind==='crash'?.14:.075;
+ osc.type=kind==='crash'?'sawtooth':'triangle';
+ osc.frequency.setValueAtTime(kind==='crash'?150:900,now);
+ osc.frequency.exponentialRampToValueAtTime(kind==='crash'?38:280,now+duration);
+ gain.gain.setValueAtTime(.0001,now);gain.gain.exponentialRampToValueAtTime(.055,now+.008);gain.gain.exponentialRampToValueAtTime(.0001,now+duration);
+ osc.connect(gain);gain.connect(ctx.destination);audioNodes.add(osc);
+ osc.onended=()=>{audioNodes.delete(osc);osc.disconnect();gain.disconnect();};osc.start();osc.stop(now+duration);
+}
+function onVerdict(event){
+ const {note,outcome,actual}=event;
+ progress.record({correct:outcome==='correct',task:note.midi+':'+outcome,mode:{clef:game.settings.clef,direction:(game.settings.range==='basic'?'Базовый':'Расширенный')+' · '+game.settings.bpm+' уд/мин'},expected:noteName(note.midi),actual:outcome==='timeout'?'Пропуск (нота не сыграна)':noteName(actual)});
+ saveBest();stats();blockMic();
+ if(outcome!=='timeout'){fx.push({...event,type:outcome==='correct'?'hit':'miss',x:note.x,midi:note.midi});playSound('shot');}
+ $('hint').textContent=outcome==='correct'?'Попадание! +1':outcome==='timeout'?'Пропуск: нота пересекла линию.':'Вы сыграли: '+noteName(actual)+'. Нужна следующая нота в кольце.';
+}
+function onCollision(event){
+ fx.push({...event,type:'crash',x:CONFIG.shipX,midi:event.note.midi});
+ blockMic();playSound('crash');stats();
+ $('stage').classList.remove('shake');void $('stage').offsetWidth;$('stage').classList.add('shake');
+ if(game.phase==='over')endGame(true);
+}
+function showScreen(type,message=''){
+ view=type;$('screen').hidden=type==='playing';$('settingsBox').hidden=!['start','over'].includes(type);
+ $('finish').hidden=!['paused','loading'].includes(type);$('result').hidden=type!=='over';$('pause').disabled=type!=='playing';
+ $('start').disabled=type==='loading';$('error').textContent=message;
+ $('stage').classList.toggle('frozen',type==='paused');
+ $('screenTitle').textContent={start:'Нотная аркада',loading:'Подключаем микрофон',paused:'Пауза',over:'Игра окончена'}[type]||'';
+ $('screenText').textContent={start:'Сыграйте ноту в кольце до пунктирной линии. Ошибка или пропуск — удар по кораблю. У вас три жизни.',loading:'Разрешите микрофон. Ноты начнут двигаться только после подключения.',paused:'Ноты и время остановлены. Для продолжения нажмите «Продолжить» и сыграйте с нового нажатия.',over:'Настройте следующую игру или попробуйте ещё раз.'}[type]||'';
+ $('start').textContent=type==='paused'?'Продолжить':type==='over'?'Ещё раз':'Старт';
+ if(type==='over')$('result').textContent=`Счёт: ${game.correct} · Точность: ${game.answers?Math.round(game.correct/game.answers*100):0}% · Рекорд серии: ${allTimeBest}`;
+}
+function releaseAudio(allowEffectTail=false){
+ generation++;cancelAnimationFrame(frame);frame=0;lastFrame=null;
+ if(stream){for(const t of stream.getTracks()){t.onended=null;t.onmute=null;t.stop();}stream=null;}
+ if(source){source.disconnect();source=null;}if(analyser){analyser.disconnect();analyser=null;}
+ if(!allowEffectTail)for(const node of audioNodes){try{node.stop();}catch{}}audioNodes.clear();
+ if(context){
+  const old=context;context=null;old.onstatechange=null;
+  // The final explosion may finish after input is fully disconnected.
+  // This timer only releases output audio; it never advances the game.
+  if(allowEffectTail)setTimeout(()=>old.close().catch(()=>{}),180);
+  else old.close().catch(()=>{});
+ }
+ $('heard').textContent='Слышу: —';$('level').style.width='0';$('meter').setAttribute('aria-valuenow','0');
+}
+function pauseGame(message=''){
+ if(!game||view==='over'||view==='start')return;
+ game.pause();releaseAudio();stable.reset();showScreen('paused',message);render();
+}
+function endGame(allowEffectTail=false){
+ game.finish();releaseAudio(allowEffectTail);showScreen('over');stats();render();
+}
+function newGame(){
+ progress.reset();fx=[];noteNodes.clear();$('notes').replaceChildren();$('stage').classList.remove('shake');
+ stable=P.stability();attack=P.onset();noise=P.noiseFloor();muteUntil=Math.max(0,effectQuietUntil-performance.now());lastLevel=0;
+ if(muteUntil)attack.block(0,.003,muteUntil);
+ game=createGame(readSettings(),{best:allTimeBest,onVerdict,onCollision});game.pause();stats();layout();render();
+}
+async function start(){
+ if(view==='loading'||view==='playing')return;
+ const resuming=view==='paused';
+ if(!resuming)newGame();
+ if(!window.isSecureContext){showScreen('paused','Микрофону нужен HTTPS. На компьютере работает localhost, но не обычный HTTP по адресу локальной сети.');return;}
+ if(!navigator.mediaDevices?.getUserMedia){showScreen('paused','Браузер не поддерживает микрофон. Откройте страницу в Safari или Chrome.');return;}
+ showScreen('loading');const token=++generation;
+ try{
+  context=new(window.AudioContext||window.webkitAudioContext)();
+  const active=context,resumed=active.resume();resumed.catch(()=>{});
+  const pending=navigator.mediaDevices.getUserMedia({audio:{echoCancellation:false,noiseSuppression:false,autoGainControl:false,channelCount:1}});
+  const acquired=await pending;
+  if(token!==generation){acquired.getTracks().forEach(t=>t.stop());return;}
+  stream=acquired;await resumed;if(token!==generation)return;
+  if(document.hidden){pauseGame();return;}
+  analyser=active.createAnalyser();analyser.fftSize=game.settings.range==='extended'?8192:4096;analyser.smoothingTimeConstant=0;
+  buffer=new Float32Array(analyser.fftSize);detect=P.detector();source=active.createMediaStreamSource(stream);source.connect(analyser);
+  for(const track of stream.getAudioTracks())track.onended=track.onmute=()=>pauseGame('Микрофон отключён или прерван. Проверьте доступ и нажмите «Продолжить».');
+  active.onstatechange=()=>{if(view==='playing'&&active.state!=='running')pauseGame('Звук прерван системой. Нажмите «Продолжить».');};
+  stable.reset();
+  if(resuming)attack.block(game.time*1000,Math.max(lastLevel,.015),Math.max(0,muteUntil-game.time*1000));
+  game.resume();lastFrame=null;showScreen('playing');$('hint').textContent='Играйте левую ноту в кольце до линии ответа.';
+  frame=requestAnimationFrame(loop);
+ }catch(error){
+  if(token===generation)pauseGame(error.name==='NotAllowedError'?'Доступ к микрофону запрещён. Разрешите его в настройках сайта и нажмите «Продолжить».':error.name==='NotFoundError'?'Микрофон не найден. Подключите его и повторите.':'Не удалось запустить микрофон. Закройте другие приложения со звуком и повторите.');
+ }
+}
+function hear(){
+ analyser.getFloatTimeDomainData(buffer);lastLevel=P.rms(buffer);
+ const percent=Math.min(100,Math.round(lastLevel*700));$('level').style.width=percent+'%';$('meter').setAttribute('aria-valuenow',percent);
+ const now=game.time*1000;
+ if(now<muteUntil){$('heard').textContent='Слышу: —';return;}
+ const pitch=detect(buffer,context.sampleRate),threshold=noise.update(lastLevel,pitch.clarity),n=P.note(pitch.frequency);
+ $('heard').textContent=n&&pitch.clarity>=.90&&lastLevel>threshold?'Слышу: '+noteName(n.midi):'Слышу: —';
+ if(!attack.update(now,lastLevel,threshold/3)){stable.reset();return;}
+ const accepted=stable.update(pitch,lastLevel,threshold);
+ if(accepted){game.answer(accepted.midi,accepted.cents);blockMic();}
+}
+function loop(now){
+ if(view!=='playing')return;
+ try{
+  const dt=lastFrame===null?0:Math.max(0,(now-lastFrame)/1000);lastFrame=now;
+  game.advance(dt);
+  if(view!=='playing')return;
+  // Advance deadlines before reading a frame: a late note cannot hit a new
+  // target using audio already accepted for the one that timed out.
+  hear();render();frame=requestAnimationFrame(loop);
+ }catch{pauseGame('Микрофон прерван. Нажмите «Продолжить».');}
+}
+function layout(){
+ const width=$('stage').clientWidth,height=$('stage').clientHeight;
+ const gap=Math.max(12,Math.min(18,width/38)),top=height*.40,bottom=top+gap*4,shipY=top+gap*2;
+ geometry={width,height,gap,top,bottom,shipY};$('staff').setAttribute('viewBox',`0 0 ${width} ${height}`);
+ const clef=game?.settings.clef||readSettings().clef;
+ let lines='';for(let i=0;i<5;i++)lines+=`M12 ${top+i*gap}H${width} `;
+ $('background').innerHTML=`<path class="staff-lines" d="${lines}"/><path class="answer-line" d="M${width*CONFIG.lineX} ${Math.max(16,top-90)}V${Math.min(height-32,bottom+90)}"/><text x="${width*CONFIG.lineX+7}" y="${Math.min(height-12,bottom+108)}" fill="#c1b493" font-size="10">ЛИНИЯ ОТВЕТА</text><text class="staff-key" x="10" y="${bottom-(clef==='treble'?.6:1.1)*gap}" font-size="${gap*4.2}">${clef==='treble'?'𝄞':'𝄢'}</text><g transform="translate(${width*CONFIG.shipX} ${shipY})"><circle class="shield" r="25"/><path fill="#f8d36c" d="M-16 -5L-30 0L-16 5Z"/><path class="ship" d="M22 0L-14 -17L-9 0L-14 17Z"/><path fill="#192c2b" d="M10 0L-5 -5L-3 5Z"/></g>`;
+}
+function noteY(midi){return geometry.bottom-noteSteps(midi,game?.settings.clef||readSettings().clef)*geometry.gap/2;}
+function render(){
+ const {width,height,gap,bottom,top,shipY}=geometry;
+ if(width<=1||height<=1)return;
+ const target=game?.target(),live=new Set();
+ for(const note of game?.notes||[]){
+  if(note.state==='hit'||note.state==='gone')continue;
+  live.add(note.id);
+  let node=noteNodes.get(note.id);
+  if(!node){
+   node=svg('g');node.append(svg('path',{'data-ledger':'',fill:'none',stroke:'currentColor','stroke-width':1.3}),svg('path',{'data-stem':'',fill:'none',stroke:'currentColor','stroke-width':1.7}),svg('ellipse',{cx:0,cy:0,transform:'rotate(-18)',fill:'currentColor'}),svg('circle',{class:'target-ring'}));
+   noteNodes.set(note.id,node);$('notes').append(node);
+  }
+  let y=noteY(note.midi);
+  if(note.state==='doomed')y+=(shipY-y)*Math.min(1,note.doomAge/CONFIG.doomSeconds);
+  node.setAttribute('transform',`translate(${note.x*width} ${y})`);node.setAttribute('class','note '+note.state);
+  const originalY=noteY(note.midi),rx=Math.max(9,gap*.68),stem=Math.max(32,gap*2.7),ledgerWidth=Math.max(14,gap*.95);let ledger='';
+  for(let yy=bottom+gap;yy<=originalY+.1;yy+=gap)ledger+=`M-${ledgerWidth} ${yy-originalY}H${ledgerWidth} `;
+  for(let yy=top-gap;yy>=originalY-.1;yy-=gap)ledger+=`M-${ledgerWidth} ${yy-originalY}H${ledgerWidth} `;
+  node.querySelector('[data-ledger]').setAttribute('d',note.state==='moving'?ledger:'');
+  node.querySelector('[data-stem]').setAttribute('d',originalY<top+gap*2?`M${-rx+1} 0v${stem}`:`M${rx-1} 0v-${stem}`);
+  node.querySelector('ellipse').setAttribute('rx',rx);node.querySelector('ellipse').setAttribute('ry',Math.max(5.8,gap*.42));
+  node.querySelector('circle').setAttribute('r',Math.max(17,gap*1.25));
+  node.querySelector('circle').setAttribute('visibility',target?.id===note.id?'visible':'hidden');
+ }
+ for(const [id,node]of noteNodes)if(!live.has(id)){node.remove();noteNodes.delete(id);}
+ const now=game?.time||0;
+ fx=fx.filter(effect=>now-effect.at<.65);
+ const effects=document.createDocumentFragment();
+ for(const effect of fx){
+  const age=Math.max(0,now-effect.at),x=effect.x*width,y=effect.type==='crash'?shipY:noteY(effect.midi),fade=Math.max(0,1-age/.65);
+  if(age<.13&&effect.type!=='crash')effects.append(svg('path',{d:`M${width*CONFIG.shipX} ${shipY}L${x} ${y+(effect.type==='miss'?-60:0)}`,stroke:effect.type==='hit'?'#b9f7ce':'#f4a0b5','stroke-width':3,fill:'none',opacity:1-age/.13}));
+  if(effect.type!=='miss'){
+   const burst=svg('g',{opacity:fade});
+   for(let i=0;i<12;i++){
+    const angle=i*Math.PI/6+effect.note.id*.7,radius=12+age*95,px=x+Math.cos(angle)*radius,py=y+Math.sin(angle)*radius;
+    burst.append(svg('path',{d:`M${px-3} ${py}h6 M${px} ${py-3}v6`,stroke:effect.type==='hit'?'#ffe0a1':'#f4a0b5','stroke-width':2}));
+   }
+   const text=svg('text',{x:x+10,y:y-20-age*25,fill:effect.type==='hit'?'#b9f7ce':'#f4a0b5','font-size':24,'font-weight':750});text.textContent=effect.type==='hit'?'+1':'−1';burst.append(text);effects.append(burst);
+  }
+ }
+ $('effects').replaceChildren(effects);
+ $('staff').setAttribute('aria-label',target?'Активная нота движется к линии ответа, '+(game.settings.clef==='treble'?'скрипичный':'басовый')+' ключ':'Ноты движутся справа к линии ответа');
+}
+$('start').onclick=start;$('pause').onclick=()=>pauseGame();$('finish').onclick=()=>{if(game)endGame();};
+document.addEventListener('visibilitychange',()=>{if(document.hidden)pauseGame();});
+window.addEventListener('pagehide',()=>{if(game&&['playing','loading'].includes(view))pauseGame();else releaseAudio();});
+$('stage').addEventListener('animationend',()=>$('stage').classList.remove('shake'));
+const resize=()=>{layout();render();};
+if(window.ResizeObserver)new ResizeObserver(resize).observe($('stage'));else window.addEventListener('resize',resize);
+rangeHint();stats();layout();render();
+})();
+</script></body></html>

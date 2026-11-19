@@ -58,6 +58,17 @@
         assert($('level').textContent === '0%' && $('errors').textContent.includes('Сыграть: до (3)'), 'Нет отдельной статистики микрофонного упражнения');
         assert($('mode').textContent.includes('Оба · C2–C6 · ♯/♭'), 'Не показаны диапазон и знаки');
         results.push({ title: 'Прогресс «Сыграй ноту», подписи задания и режима', ok: true });
+        const arcade = { ...records[0], id: 'arcade7', exercise: 'note-shooter', mode: { clef: 'bass', direction: 'Расширенный · 160 уд/мин' }, task: '48:timeout', expected: 'до (3)', actual: 'Пропуск (нота не сыграна)', correct: false };
+        await store.append(arcade);
+        doc.dispatchEvent(new win.Event('visibilitychange')); await wait(() => $('answers').textContent === '73');
+        $('exercise').value = 'note-shooter'; $('exercise').dispatchEvent(new win.Event('change'));
+        assert($('errors').textContent.includes('Пропуск') && $('mode').textContent.includes('Басовый ключ · Расширенный · 160 уд/мин'), 'Нет аркады, тайм-аутов или режима');
+        await store.append({ ...arcade, id: 'arcade-right', task: '48:correct', correct: true, actual: 'до (3)' });
+        await store.append({ ...arcade, id: 'arcade-wrong', task: '48:wrong', actual: 'ре (3)' });
+        doc.dispatchEvent(new win.Event('visibilitychange')); await wait(() => $('answers').textContent === '75');
+        const arcadeRows = $('errors').querySelectorAll('tbody tr');
+        assert(arcadeRows.length === 1 && arcadeRows[0].cells[1].textContent === '3' && arcadeRows[0].cells[2].textContent === '2' && arcadeRows[0].cells[3].textContent === '33%', 'Вердикты разделили статистику одной целевой ноты');
+        results.push({ title: 'Нотная аркада: ключ, диапазон, темп, тайм-ауты', ok: true });
       }
     } catch (error) { results.push({ title: 'Страница, ширина ' + width, ok: false, error: error.message }); }
     finally { await win.SolfegeProgress.store.close(); frame.remove(); }
