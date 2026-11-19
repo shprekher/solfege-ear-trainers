@@ -35,7 +35,7 @@ button,select{font:inherit;min-height:44px;border:1px solid var(--edge);border-r
  <svg id="staff" role="img" aria-label="Ноты движутся справа к линии ответа"><g id="background"></g><g id="notes"></g><g id="effects" aria-hidden="true"></g></svg>
  <div class="screen" id="screen"><section class="panel" aria-labelledby="screenTitle">
   <h2 id="screenTitle">Нотная аркада</h2>
-  <p id="screenText">Играйте ближайшую ноту справа от линии, пока она её не пересекла. Ошибка или пропуск отнимает одну из трёх жизней.</p>
+  <p id="screenText">Играйте ближайшую ноту справа от линии, пока она её не пересекла. Ошибка или пропуск отнимает жизнь: в базовом диапазоне их три, в расширенном пять.</p>
   <p class="result" id="result" hidden></p>
   <div id="settingsBox">
    <div class="settings">
@@ -56,7 +56,7 @@ button,select{font:inherit;min-height:44px;border:1px solid var(--edge);border-r
 </div>
 <div class="bottom"><p id="hint" role="status">Играйте ближайшую ноту справа от линии. Нужна та же октава.</p><a href="./progress.html">Мой прогресс</a></div>
 </main>
-<script src="./pitch-detector.js?v=piano-attack"></script><script src="./progress-store.js"></script>
+<script src="./pitch-detector.js?v=vote"></script><script src="./progress-store.js"></script>
 <script>
 (() => {
 'use strict';
@@ -67,7 +67,7 @@ const CONFIG = Object.freeze({
   bass: Object.freeze({basic:Object.freeze([43,57]),extended:Object.freeze([40,60])})
  }),
  shipX:.12, lineX:.38, spawnX:.95, travelBeats:8, spawnBeats:2,
- doomSeconds:.6, cooldownMs:65, lives:3, minBpm:60, maxBpm:160, bpmStep:10
+ doomSeconds:.6, cooldownMs:65, lives:Object.freeze({basic:3,extended:5}), minBpm:60, maxBpm:160, bpmStep:10
 });
 const natural=[0,2,4,5,7,9,11], syllables=['до','ре','ми','фа','соль','ля','си'];
 const noteName = midi => {
@@ -87,7 +87,8 @@ function createGame(settings, {random=Math.random,onVerdict=()=>{},onCollision=(
  if(!range||!Number.isInteger(settings.bpm)||settings.bpm<CONFIG.minBpm||settings.bpm>CONFIG.maxBpm||settings.bpm%CONFIG.bpmStep)throw Error('Неверные настройки игры');
  const pool=[];for(let n=range[0];n<=range[1];n++)if(natural.includes(n%12))pool.push(n);
  const beat=60/settings.bpm, interval=CONFIG.spawnBeats*beat;
- const game={settings:Object.freeze({...settings}),phase:'running',time:0,notes:[],lives:CONFIG.lives,answers:0,correct:0,streak:0,best,spawnIn:interval};
+ const maxLives=CONFIG.lives[settings.range];
+ const game={settings:Object.freeze({...settings}),phase:'running',time:0,notes:[],lives:maxLives,maxLives,answers:0,correct:0,streak:0,best,spawnIn:interval};
  let previous=null, serial=0;
  function spawn(){
   const candidates=pool.filter(n=>n!==previous),midi=candidates[Math.min(candidates.length-1,Math.floor(random()*candidates.length))];previous=midi;
@@ -164,8 +165,8 @@ for(const id of ['clef','range','bpm'])$(id).addEventListener('change',()=>{
  rangeHint();if(!game){layout();render();}
 });
 let game=null,view='start',frame=0,lastFrame=null,generation=0,context=null,stream=null,source=null,analyser=null;
-const pitchProfile=Object.freeze({minClarity:.88,maxDrift:26,allowedGaps:1});
-let buffer,recent,detect,stable=P.stability(pitchProfile),attack=P.onset(),noise=P.noiseFloor(),muteUntil=0,lastLevel=0;
+const pitchProfile=Object.freeze({minClarity:.88,window:6,minHits:2});
+let buffer,recent,detect,stable=P.vote(pitchProfile),attack=P.onset(),noise=P.noiseFloor({minThreshold:.0022,multiplier:2.5}),muteUntil=0,lastLevel=0;
 let confirmed=null,confirmedUntil=0;
 let fx=[],noteNodes=new Map(),geometry={width:1,height:1};
 const svgNS='http://www.w3.org/2000/svg';
@@ -188,11 +189,11 @@ const shipSprite=`<g id="ship" class="pixel-sprite" data-thrust="0">
 function stats(){
  const g=game;$('answers').textContent=g?.answers||0;$('streak').textContent=g?.streak||0;
  $('accuracy').textContent=g?.answers?Math.round(g.correct/g.answers*100)+'%':'—';$('best').textContent=allTimeBest;
- $('hearts').replaceChildren(...Array.from({length:CONFIG.lives},(_,i)=>{
-  const heart=svg('svg',{viewBox:'0 0 16 15',class:i<(g?.lives??CONFIG.lives)?'pixel-sprite':'pixel-sprite lost','aria-hidden':'true'});
+ $('hearts').replaceChildren(...Array.from({length:g?.maxLives??CONFIG.lives.basic},(_,i)=>{
+  const heart=svg('svg',{viewBox:'0 0 16 15',class:i<(g?.lives??CONFIG.lives.basic)?'pixel-sprite':'pixel-sprite lost','aria-hidden':'true'});
   heart.append(svg('path',{d:heartPath}));return heart;
  }));
- $('hearts').setAttribute('aria-label','Жизни: '+(g?.lives??3));
+ $('hearts').setAttribute('aria-label','Жизни: '+(g?.lives??CONFIG.lives.basic));
 }
 function saveBest(){
  if(game.best<=allTimeBest)return;allTimeBest=game.best;
@@ -243,7 +244,7 @@ function endGame(){
 }
 function newGame(){
  progress.reset();fx=[];noteNodes.clear();$('notes').replaceChildren();$('stage').classList.remove('shake');
- stable.reset();attack=P.onset();noise=P.noiseFloor();muteUntil=0;lastLevel=0;
+ stable.reset();attack=P.onset();noise=P.noiseFloor({minThreshold:.0022,multiplier:2.5});muteUntil=0;lastLevel=0;
  confirmed=null;confirmedUntil=0;
  game=createGame(readSettings(),{best:allTimeBest,onVerdict,onCollision});game.pause();stats();layout();render();
 }
@@ -283,8 +284,12 @@ function hear(){
  if(now<muteUntil){showWaiting('Жду нового нажатия');return;}
  const pitch=detect(buffer,context.sampleRate),threshold=noise.update(lastLevel,pitch.clarity);
  if(!attack.update(now,lastLevel,threshold/3)){stable.reset();showWaiting('Жду нового нажатия');return;}
- const accepted=stable.update(pitch,lastLevel,threshold);
+ const accepted=stable.update(pitch,lastLevel,threshold,440,now);
  if(!accepted){showWaiting(pitch.frequency&&pitch.clarity>=pitchProfile.minClarity&&lastLevel>threshold?'Уточняю ноту…':'Слышу: —');return;}
+ // Confirm the target from two matching frames; a wrong note needs three
+ // so a chance high-register frame cannot cost a life.
+ const target=game.target(),needed=target&&accepted.midi===target.midi?2:3;
+ if(accepted.hits<needed){showWaiting('Уточняю ноту…');return;}
  const verdict=game.answer(accepted.midi,accepted.cents);
  if(!verdict){blockMic();showWaiting('Ждите следующую ноту');return;}
  confirmed=accepted.midi;confirmedUntil=now+320;showWaiting('');

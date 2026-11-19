@@ -78,6 +78,23 @@
       }
     };
   }
+  function vote({ minClarity = .88, window = 6, minHits = 2, memory = 400 } = {}) {
+    let frames = [];
+    const reset = () => { frames = []; };
+    return {
+      reset,
+      update(pitch, level, threshold, a4 = 440, now = 0) {
+        const n = note(pitch.frequency, a4);
+        if (n && pitch.clarity >= minClarity && level > threshold) frames.push({ midi: n.midi, cents: n.cents, at: now });
+        frames = frames.filter(f => now - f.at <= memory).slice(-window);
+        if (!n) return null;
+        const hits = frames.filter(f => f.midi === n.midi);
+        if (hits.length < minHits) return null;
+        const cents = [...hits].map(f => f.cents).sort((a, b) => a - b)[Math.floor(hits.length / 2)];
+        return { midi: n.midi, cents, hits: hits.length };
+      }
+    };
+  }
   function onset() {
     let blockedUntil = 0, waiting = false, dipped = false, dipAt = null, peak = 0, low = 0;
     return {
@@ -101,16 +118,16 @@
       }
     };
   }
-  function noiseFloor() {
+  function noiseFloor({ minThreshold = .003, multiplier = 3, learning = .025 } = {}) {
     let floor = .001;
     return {
-      get threshold() { return Math.max(.003, floor * 3); },
+      get threshold() { return Math.max(minThreshold, floor * multiplier); },
       update(level, clarity) {
         // Never learn a sustained, clear piano tone as room noise.
-        if (level < floor * 2 || clarity < .5) floor += (Math.min(level, .012) - floor) * .025;
+        if (level < floor * 2 || clarity < .5) floor += (Math.min(level, .012) - floor) * learning;
         return this.threshold;
       }
     };
   }
-  window.PitchDetector = Object.freeze({ frequency, note, rms, pianoWindowSize, detector, stability, onset, noiseFloor });
+  window.PitchDetector = Object.freeze({ frequency, note, rms, pianoWindowSize, detector, stability, vote, onset, noiseFloor });
 })();

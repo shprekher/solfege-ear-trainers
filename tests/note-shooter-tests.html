@@ -82,6 +82,7 @@ try{
  });
  await test('Конфиг диапазонов, только натуральные, без повторов',()=>{
   const expected={treble:{basic:[60,71],extended:[59,83]},bass:{basic:[43,57],extended:[40,60]}};
+  assert(JSON.stringify(C.lives)===JSON.stringify({basic:3,extended:5}),'Жизни по диапазону');
   assert(JSON.stringify(C.ranges)===JSON.stringify(expected),'Границы диапазонов');
   for(const clef of ['treble','bass'])for(const range of ['basic','extended']){
    const [low,high]=C.ranges[clef][range];let previous=null;
