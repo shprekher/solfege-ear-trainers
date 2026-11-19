@@ -111,6 +111,23 @@ try{
    g.advance(travel-interval);assert(events.length===1&&near(events[0].at,travel,.017),'Восемь бит');
   }
  });
+ await test('Адаптивные веса и победа после 50 верных',()=>{
+  const pick=S.weightedPick;
+  assert(pick([60,62],null,{60:0,62:.9},()=>.5)===62,'Нота с ошибками не получила вес');
+  assert(pick([60,62],62,{60:0,62:.9},()=>.5)===60,'Одна и та же нота подряд');
+  let seed=7;const random=()=>{seed=(1664525*seed+1013904223)>>>0;return seed/2**32;};
+  const counts={};for(let i=0;i<3000;i++){const n=pick([60,62,64],null,{60:0,62:.8,64:0},random);counts[n]=(counts[n]||0)+1;}
+  assert(counts[62]>counts[60]*1.5,'Нет адаптивного перекоса');
+  const victories=[];const g=create({}, {onVictory:value=>victories.push(value.bpm)});
+  for(let i=0;i<49;i++){g.advance(1.5);g.answer(g.target().midi);}
+  assert(victories.length===0,'Победа раньше 50');
+  g.advance(1.5);g.answer(g.target().midi);
+  assert(victories.length===1&&g.sinceVictory===0,'Нет победы на 50-й ноте');
+  g.advance(1.5);g.answer(g.target().midi);
+  assert(victories.length===1,'Победа повторилась сразу');
+  g.setBpm(90);assert(g.bpm===90&&g.beat===60/90,'Темп не изменился');
+  g.setBpm(200);assert(g.bpm===160,'Темп не ограничен');
+ });
  await test('Верный ответ: hit, +1, серия и следующая цель сразу',()=>{
   const events=[],g=create({}, {onVerdict:e=>events.push(e),best:4});g.advance(3);
   const first=g.target(),next=g.notes[1];g.answer(first.midi);
@@ -251,7 +268,7 @@ try{
  });
  await test('Аркада засчитывает соль второй октавы с растянутым строем и си подряд',async()=>{
   $('clef').value='treble';$('range').value='extended';$('bpm').value='80';
-  let draws=0;w.Math.random=()=>draws++===0?12.2/15:13.2/14;
+  let draws=0;m.values.delete('solfege-note-shooter-rates');w.Math.random=()=>draws++===0?12.2/15:13.2/14;
   m.defer=false;m.level=0;$('start').click();await until(()=>m.connected===5);
   m.step(0);m.step(1600);
   const first= m.now-20;

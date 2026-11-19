@@ -18,6 +18,7 @@ button,select{font:inherit;min-height:44px;border:1px solid var(--edge);border-r
 .screen{position:absolute;z-index:2;inset:0;display:grid;place-items:center;padding:12px;background:#ffffffe0}.screen[hidden]{display:none}.panel{width:min(100%,430px);max-height:100%;overflow:auto;overscroll-behavior:contain;background:#fff;border:2px solid var(--edge);border-top:6px solid var(--blue);padding:20px;box-shadow:4px 4px #d5deec}.panel h2{font:800 24px/1.2 var(--mono);letter-spacing:-.05em;margin:0 0 8px}.panel p{margin:8px 0;color:var(--muted)}.settings{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:16px 0}.settings label{display:flex;flex-direction:column;gap:5px;font-size:13px}.settings select{width:100%;min-width:0}.settings .wide{grid-column:1/-1}.actions{display:flex;gap:8px;margin-top:16px}.actions button{flex:1}.range-hint{font-size:12px;min-height:34px}.error{color:var(--red)!important}.error:empty{display:none}.result{font-size:17px!important;color:var(--ink)!important}.small{font-size:12px}
 .metrics{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:5px;text-align:center;flex:none}.metric{padding:3px 0 5px;background:var(--metal);border-bottom:2px solid #a4b3cc}.metric b{display:block;font:800 24px/1.25 var(--mono);color:#192b63}.metric span{font-size:10px;color:var(--muted)}.bottom{display:flex;justify-content:space-between;gap:12px;align-items:center;font-size:12px;color:var(--muted);flex:none}.bottom p{margin:0;max-width:75%}
 .stage.shake{animation:shake .4s ease-out}.stage.frozen{animation-play-state:paused}
+.victory{position:absolute;left:0;right:0;top:0;height:36%;z-index:4;display:flex;align-items:center;justify-content:center;overflow:hidden;pointer-events:none;background:linear-gradient(#eef4ffaa,#fff0 78%)}.victory[hidden]{display:none}.victory-stars{position:absolute;inset:0}.victory-stars i{position:absolute;bottom:-6px;left:var(--x);width:var(--s);height:var(--s);background:var(--c);box-shadow:0 0 6px var(--c);animation:star-rise var(--d) linear forwards}.victory-ship{position:absolute;left:-42px;bottom:18%;width:34px;height:22px;animation:ship-fly 1.25s linear forwards}@keyframes star-rise{from{transform:translateY(18px);opacity:1}to{transform:translateY(calc(-1*var(--h)));opacity:0}}@keyframes ship-fly{to{left:calc(100% + 42px)}}.victory-card{position:relative;z-index:1;text-align:center;font-family:var(--mono);border:2px solid #263f9d;padding:5px 14px;background:#fffffff2;box-shadow:3px 3px 0 #b32949;transform:skewX(-4deg);max-width:92%}.victory-card span{display:block;font-size:10px;letter-spacing:.3em;color:#263f9d}.victory-card strong{display:block;font-size:clamp(20px,5vw,30px);letter-spacing:-.04em;color:#17233c;text-shadow:2px 2px 0 #b32949;margin:1px 0}.victory-card small{font-size:11px;color:#8a5b00}@media(prefers-reduced-motion:reduce){.victory-stars i,.victory-ship{display:none}}
 @keyframes shake{0%,100%{transform:translateX(0)}20%,60%{transform:translateX(-7px)}40%,80%{transform:translateX(6px)}}
 @media(max-width:420px){main{gap:8px;min-height:580px}.hud{gap:8px;padding:10px}.hearts svg{width:17px;height:15px}.hud button{padding:7px 9px}#heard{font-size:12px}.panel{padding:16px}.panel h2{font-size:22px}.settings{gap:8px;margin:12px 0}.back{font-size:11px}.bottom{font-size:11px}}
 @media(prefers-reduced-motion:reduce){.stage.shake{animation:none}}
@@ -49,6 +50,7 @@ button,select{font:inherit;min-height:44px;border:1px solid var(--edge);border-r
   <p class="error" id="error" role="alert"></p>
   <div class="actions"><button class="primary" id="start">Старт</button><button id="finish" hidden>Завершить</button></div>
  </section></div>
+ <div class="victory" id="victory" hidden role="status" aria-live="assertive"><div class="victory-stars" id="victoryStars"></div><svg class="victory-ship" viewBox="0 0 34 22" aria-hidden="true" shape-rendering="crispEdges"><g><path fill="#17233c" d="M1 8h5V5h5V2h9v3h5v3h8v4h-8v4h-5v3h-9v-3H6v-3H1z"/><path fill="#8fa3c4" d="M7 8h5V5h4V3h3v2h4v3h4v4h-4v3h-4v2h-3v-2H7z"/><path fill="#e8f4ff" d="M10 8h7V6h4v2h3v3H10z"/><path fill="#b32949" d="M3 7H1v7h2zM27 4h3v3h-3z"/><path fill="#263f9d" d="M12 10h5v2h-5z"/><path fill="#ffc245" d="M1 10h-4v2h4z"/></g></svg><div class="victory-card"><span>ВОЛНА 50</span><strong>ОТБИТО!</strong><small id="victoryNote">ТЕМП +10</small></div></div>
 </div>
 </section>
 <div class="metrics" aria-label="Статистика">
@@ -67,7 +69,8 @@ const CONFIG = Object.freeze({
   bass: Object.freeze({basic:Object.freeze([43,57]),extended:Object.freeze([40,60])})
  }),
  shipX:.12, lineX:.38, spawnX:.95, travelBeats:8, spawnBeats:2,
- doomSeconds:.6, cooldownMs:65, lives:Object.freeze({basic:3,extended:5}), minBpm:60, maxBpm:160, bpmStep:10
+ doomSeconds:.6, cooldownMs:65, lives:Object.freeze({basic:3,extended:5}), minBpm:60, maxBpm:160, bpmStep:10,
+ victoryNotes:50, adaptive:Object.freeze({bias:4,maxWeight:5,decay:.85,errorBoost:.35})
 });
 const natural=[0,2,4,5,7,9,11], syllables=['до','ре','ми','фа','соль','ля','си'];
 const noteName = midi => {
@@ -83,32 +86,62 @@ function answerName(midi) {
 const pitchName=midi=>{const pc=((midi%12)+12)%12,index=natural.indexOf(pc);return index>=0?syllables[index]:syllables[natural.filter(n=>n<pc).pop()]+'♯';};
 function diatonic(midi) { return (Math.floor(midi/12)-1)*7+natural.indexOf(midi%12); }
 function noteSteps(midi,clef) { return diatonic(midi)-(clef==='treble'?4*7+2:2*7+4); }
-function createGame(settings, {random=Math.random,onVerdict=()=>{},onCollision=()=>{},best=0}={}) {
+// Weighted draw: a note above the pool's average error rate becomes more
+// likely, up to a cap. The previous note is always excluded.
+function weightedPick(pool, previous, rates, random = Math.random) {
+ const candidates = pool.filter(n => n !== previous);
+ if (!candidates.length) return pool[0];
+ const mean = pool.reduce((sum, n) => sum + (rates[n] || 0), 0) / pool.length;
+ const weights = candidates.map(n => {
+  const extra = Math.max(0, (rates[n] || 0) - mean);
+  return Math.min(CONFIG.adaptive.maxWeight, 1 + CONFIG.adaptive.bias * extra);
+ });
+ const total = weights.reduce((a, b) => a + b, 0);
+ let value = random() * total;
+ for (let i = 0; i < candidates.length; i++) {
+  value -= weights[i];
+  if (value <= 0) return candidates[i];
+ }
+ return candidates[candidates.length - 1];
+}
+function createGame(settings, {random=Math.random,onVerdict=()=>{},onCollision=()=>{},onVictory=()=>{},best=0,rates={}}={}) {
  const range=CONFIG.ranges[settings.clef]?.[settings.range];
  if(!range||!Number.isInteger(settings.bpm)||settings.bpm<CONFIG.minBpm||settings.bpm>CONFIG.maxBpm||settings.bpm%CONFIG.bpmStep)throw Error('Неверные настройки игры');
  const pool=[];for(let n=range[0];n<=range[1];n++)if(natural.includes(n%12))pool.push(n);
- const beat=60/settings.bpm, interval=CONFIG.spawnBeats*beat;
- const maxLives=CONFIG.lives[settings.range];
- const game={settings:Object.freeze({...settings}),phase:'running',time:0,notes:[],lives:maxLives,maxLives,answers:0,correct:0,streak:0,best,spawnIn:interval};
+ const maxLives=CONFIG.lives[settings.range], cleanRates={};
+ for(const [key,value] of Object.entries(rates))if(Number.isFinite(+value)&&+value>=0&&+value<=1)cleanRates[key]=+value;
+ const game={settings:Object.freeze({...settings}),phase:'running',time:0,notes:[],lives:maxLives,maxLives,answers:0,correct:0,streak:0,best,rates:cleanRates,sinceVictory:0,victories:0,bpm:settings.bpm,beat:60/settings.bpm,spawnIn:CONFIG.spawnBeats*60/settings.bpm};
  let previous=null, serial=0;
  function spawn(){
-  const candidates=pool.filter(n=>n!==previous),midi=candidates[Math.min(candidates.length-1,Math.floor(random()*candidates.length))];previous=midi;
-  game.notes.push({id:++serial,midi,x:CONFIG.spawnX,speed:(CONFIG.spawnX-CONFIG.lineX)/(CONFIG.travelBeats*beat),state:'moving',age:0,doomAge:0});
+  const midi=weightedPick(pool,previous,game.rates,random);previous=midi;
+  game.notes.push({id:++serial,midi,x:CONFIG.spawnX,speed:(CONFIG.spawnX-CONFIG.lineX)/(CONFIG.travelBeats*game.beat),state:'moving',age:0,doomAge:0});
  }
  game.target=()=>game.notes.filter(n=>n.state==='moving').reduce((left,n)=>!left||n.x<left.x?n:left,null);
  function resolve(note,outcome,actual=null){
   if(game.phase!=='running'||note.state!=='moving')return null;
   note.outcome=outcome;note.actual=actual;note.verdictAt=game.time;
   game.answers++;
-  if(outcome==='correct'){note.state='hit';note.hitAge=0;game.correct++;game.streak++;game.best=Math.max(game.best,game.streak);}
-  else{note.state='doomed';note.doomAge=0;note.speed=(note.x-CONFIG.shipX)/CONFIG.doomSeconds;game.streak=0;}
+  const rate=game.rates[note.midi]||0;
+  game.rates[note.midi]=outcome==='correct'?rate*CONFIG.adaptive.decay:Math.min(1,rate+CONFIG.adaptive.errorBoost);
+  if(outcome==='correct'){
+   note.state='hit';note.hitAge=0;game.correct++;game.streak++;game.best=Math.max(game.best,game.streak);
+   game.sinceVictory++;
+  }else{note.state='doomed';note.doomAge=0;note.speed=(note.x-CONFIG.shipX)/CONFIG.doomSeconds;game.streak=0;game.sinceVictory=0;}
   const event={note,outcome,actual,at:game.time};
-  onVerdict(event,game);return event;
+  onVerdict(event,game);
+  if(outcome==='correct'&&game.sinceVictory>=CONFIG.victoryNotes){
+   game.sinceVictory=0;game.victories++;onVictory(game);
+  }
+  return event;
  }
  game.answer=(midi,cents=0)=>{
   const target=game.target();
   if(game.phase!=='running'||!target)return null;
   return resolve(target,midi===target.midi&&Math.abs(cents)<=50?'correct':'wrong',midi);
+ };
+ game.setBpm=next=>{
+  game.bpm=Math.max(CONFIG.minBpm,Math.min(CONFIG.maxBpm,Math.round(next/CONFIG.bpmStep)*CONFIG.bpmStep));
+  game.beat=60/game.bpm;game.spawnIn=Math.min(game.spawnIn,CONFIG.spawnBeats*game.beat);return game.bpm;
  };
  game.pause=()=>{if(game.phase==='running')game.phase='paused';};
  game.resume=()=>{if(game.phase==='paused')game.phase='running';};
@@ -119,7 +152,7 @@ function createGame(settings, {random=Math.random,onVerdict=()=>{},onCollision=(
   // Small deterministic slices preserve spawn/crossing/collision order even
   // when a slow frame contains several beats. No speed is shared by notes.
   while(remaining>1e-9&&game.phase==='running'){
-   if(game.spawnIn<=1e-9){spawn();game.spawnIn+=interval;}
+   if(game.spawnIn<=1e-9){spawn();game.spawnIn+=CONFIG.spawnBeats*game.beat;}
    const step=Math.min(remaining,1/60,game.spawnIn);
    game.time+=step;game.spawnIn-=step;remaining-=step;
    for(const note of game.notes){
@@ -139,15 +172,15 @@ function createGame(settings, {random=Math.random,onVerdict=()=>{},onCollision=(
    }
    game.notes=game.notes.filter(n=>n.state!=='gone');
   }
-  if(game.phase==='running'&&game.spawnIn<=1e-9){spawn();game.spawnIn+=interval;}
+  if(game.phase==='running'&&game.spawnIn<=1e-9){spawn();game.spawnIn+=CONFIG.spawnBeats*game.beat;}
  };
  spawn();return game;
 }
-window.NoteShooter=Object.freeze({CONFIG,createGame,noteName,noteSteps});
+window.NoteShooter=Object.freeze({CONFIG,createGame,noteName,noteSteps,weightedPick});
 
 const $=id=>document.getElementById(id), P=window.PitchDetector, progress=window.SolfegeProgress.tracker('note-shooter');
 const intro=$('screenText').textContent;
-const settingsKey='solfege-note-shooter-settings',bestKey='solfege-note-shooter-best';
+const settingsKey='solfege-note-shooter-settings',bestKey='solfege-note-shooter-best',ratesKey='solfege-note-shooter-rates';
 let allTimeBest=0;
 try{
  const saved=JSON.parse(localStorage.getItem(settingsKey)||'{}');
@@ -157,19 +190,27 @@ try{
  const best=Number(localStorage.getItem(bestKey));if(Number.isSafeInteger(best)&&best>=0)allTimeBest=best;
 }catch{}
 const readSettings=()=>({clef:$('clef').value,range:$('range').value,bpm:+$('bpm').value});
+function saveSettings(){try{localStorage.setItem(settingsKey,JSON.stringify(readSettings()));}catch{}}
+function readRates(){
+ try{
+  const saved=JSON.parse(localStorage.getItem(ratesKey)||'{}'),clean={};
+  for(const [key,value]of Object.entries(saved))if(Number.isFinite(+value)&&+value>=0&&+value<=1)clean[key]=+value;
+  return clean;
+ }catch{return{}}
+}
+function saveRates(){try{localStorage.setItem(ratesKey,JSON.stringify(game.rates));}catch{}}
 function rangeHint(){
  const s=readSettings(),[low,high]=CONFIG.ranges[s.clef][s.range];
  $('rangeHint').textContent=`${noteName(low)} — ${noteName(high)}. До линии: ${(8*60/s.bpm).toFixed(1).replace('.',',')} с. Новая нота каждые ${(2*60/s.bpm).toFixed(2).replace('.',',')} с.`;
 }
 for(const id of ['clef','range','bpm'])$(id).addEventListener('change',()=>{
- try{localStorage.setItem(settingsKey,JSON.stringify(readSettings()));}catch{}
- rangeHint();if(!game){layout();render();}
+ saveSettings();rangeHint();if(!game){layout();render();}
 });
 let game=null,view='start',frame=0,lastFrame=null,generation=0,context=null,stream=null,source=null,analyser=null;
 const pitchProfile=Object.freeze({minClarity:.88,window:6,minHits:2});
 let buffer,recent,detect,stable=P.vote(pitchProfile),attack=P.onset(),noise=P.noiseFloor({minThreshold:.0022,multiplier:2.5}),muteUntil=0,lastLevel=0;
 let confirmed=null,confirmedUntil=0,targetHits=0;
-let fx=[],noteNodes=new Map(),geometry={width:1,height:1};
+let fx=[],noteNodes=new Map(),geometry={width:1,height:1},victoryTimer=null;
 const svgNS='http://www.w3.org/2000/svg';
 const reducedMotion=matchMedia('(prefers-reduced-motion: reduce)');
 function svg(tag,attrs){const node=document.createElementNS(svgNS,tag);for(const [key,value]of Object.entries(attrs||{}))node.setAttribute(key,value);return node;}
@@ -206,8 +247,8 @@ function blockMic(){
 }
 function onVerdict(event){
  const {note,outcome,actual}=event;
- progress.record({correct:outcome==='correct',task:note.midi+':'+outcome,mode:{clef:game.settings.clef,direction:(game.settings.range==='basic'?'Базовый':'Расширенный')+' · '+game.settings.bpm+' уд/мин'},expected:noteName(note.midi),actual:outcome==='timeout'?'Пропуск (нота не сыграна)':noteName(actual)});
- saveBest();stats();blockMic();
+ progress.record({correct:outcome==='correct',task:note.midi+':'+outcome,mode:{clef:game.settings.clef,direction:(game.settings.range==='basic'?'Базовый':'Расширенный')+' · '+game.bpm+' уд/мин'},expected:noteName(note.midi),actual:outcome==='timeout'?'Пропуск (нота не сыграна)':noteName(actual)});
+ saveBest();saveRates();stats();blockMic();
  fx.push({id:note.id,at:event.at,type:outcome,x:note.x,midi:note.midi});
  const correctName=outcome==='correct'?'':answerName(note.midi);
  $('hint').textContent=outcome==='correct'?'Попадание! +1 · '+answerName(note.midi):outcome==='timeout'?'Пропуск. Правильно: '+correctName+'.':'Вы сыграли: '+noteName(actual)+'. Правильно: '+correctName+'.';
@@ -229,7 +270,7 @@ function showScreen(type,message=''){
  if(type==='over')$('result').textContent=`Счёт: ${game.correct} · Точность: ${game.answers?Math.round(game.correct/game.answers*100):0}% · Рекорд серии: ${allTimeBest}`;
 }
 function releaseAudio(){
- generation++;cancelAnimationFrame(frame);frame=0;lastFrame=null;
+ generation++;cancelAnimationFrame(frame);frame=0;lastFrame=null;clearVictory();
  if(stream){for(const t of stream.getTracks()){t.onended=null;t.onmute=null;t.stop();}stream=null;}
  if(source){source.disconnect();source=null;}if(analyser){analyser.disconnect();analyser=null;}
  if(context){const old=context;context=null;old.onstatechange=null;old.close().catch(()=>{});}
@@ -243,11 +284,40 @@ function pauseGame(message=''){
 function endGame(){
  game.finish();releaseAudio();showScreen('over');stats();render();
 }
+function clearVictory(){if(victoryTimer!==null){clearTimeout(victoryTimer);victoryTimer=null;}$('victory').hidden=true;}
+function celebrate(noteText){
+ game.pause();view='victory';stable.reset();targetHits=0;cancelAnimationFrame(frame);frame=0;
+ const stars=$('victoryStars');stars.replaceChildren();
+ if(!reducedMotion.matches)for(let i=0;i<24;i++){
+  const star=document.createElement('i'),colors=['#2a6bd4','#b32949','#e59b12','#129c9c'];
+  star.style.setProperty('--x',(Math.random()*100).toFixed(1)+'%');
+  star.style.setProperty('--s',(2+Math.random()*3).toFixed(1)+'px');
+  star.style.setProperty('--c',colors[i%colors.length]);
+  star.style.setProperty('--h',(60+Math.random()*90).toFixed(0)+'px');
+  star.style.setProperty('--d',(.8+Math.random()*.8).toFixed(2)+'s');
+  star.style.animationDelay=(Math.random()*.35).toFixed(2)+'s';
+  stars.append(star);
+ }
+ $('victoryNote').textContent=noteText;$('victory').hidden=false;$('pause').disabled=true;
+ victoryTimer=setTimeout(()=>{
+  victoryTimer=null;$('victory').hidden=true;
+  if(!game||game.phase!=='paused'||view!=='victory')return;
+  view='playing';game.resume();lastFrame=null;$('pause').disabled=false;targetHits=0;
+  attack.block(game.time*1000,Math.max(lastLevel,.003),CONFIG.cooldownMs);
+  $('hint').textContent='Волна отбита! Темп выше — играйте дальше.';
+  frame=requestAnimationFrame(loop);
+ },reducedMotion.matches?1200:1900);
+}
+function onVictory(g){
+ const next=Math.min(CONFIG.maxBpm,g.bpm+CONFIG.bpmStep),changed=next>g.bpm;
+ if(changed){g.setBpm(next);$('bpm').value=String(next);saveSettings();rangeHint();}
+ celebrate(changed?'ТЕМП +10 → '+next+' УДАРОВ':'МАКСИМАЛЬНЫЙ ТЕМП');
+}
 function newGame(){
- progress.reset();fx=[];noteNodes.clear();$('notes').replaceChildren();$('stage').classList.remove('shake');
+ progress.reset();fx=[];noteNodes.clear();$('notes').replaceChildren();$('stage').classList.remove('shake');clearVictory();
  stable.reset();attack=P.onset();noise=P.noiseFloor({minThreshold:.0022,multiplier:2.5});muteUntil=0;lastLevel=0;targetHits=0;
  confirmed=null;confirmedUntil=0;
- game=createGame(readSettings(),{best:allTimeBest,onVerdict,onCollision});game.pause();stats();layout();render();
+ game=createGame(readSettings(),{best:allTimeBest,onVerdict,onCollision,onVictory,rates:readRates()});game.pause();stats();layout();render();
 }
 async function start(){
  if(view==='loading'||view==='playing')return;
@@ -316,7 +386,7 @@ function loop(now){
   if(view!=='playing')return;
   // Advance deadlines before reading a frame: a late note cannot hit a new
   // target using audio already accepted for the one that timed out.
-  hear();render();frame=requestAnimationFrame(loop);
+  hear();render();if(view!=='playing')return;frame=requestAnimationFrame(loop);
  }catch{pauseGame('Микрофон прерван. Нажмите «Продолжить».');}
 }
 function layout(){
