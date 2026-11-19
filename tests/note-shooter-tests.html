@@ -13,7 +13,7 @@ try{
  const [html,store]=await Promise.all(['../note-shooter.html','../progress-store.js'].map(async url=>(await fetch(url,{cache:'no-store'})).text()));
  const isolated=store.replace("DB_NAME = 'solfege-ear-trainers-progress'","DB_NAME = "+JSON.stringify(db));
  const mock=`
- window.mock={midi:60,level:0,now:0,next:0,callbacks:new Map(),values:new Map(),stopped:0,connected:0,deny:true,sounds:0,defer:false};
+ window.mock={midi:60,level:0,now:0,next:0,callbacks:new Map(),values:new Map(),stopped:0,connected:0,deny:true,outputAttempts:0,defer:false};
  Object.defineProperty(window,'localStorage',{value:{getItem:key=>mock.values.get(key)??null,setItem:(key,value)=>mock.values.set(key,String(value))}});
  Math.random=()=>0;
  window.requestAnimationFrame=fn=>{const id=++mock.next;mock.callbacks.set(id,fn);return id;};
@@ -26,16 +26,16 @@ try{
   return mock.defer?new Promise(resolve=>mock.resolve=()=>resolve(stream)):Promise.resolve(stream);
  }}});
  window.AudioContext=class{
-  constructor(){this.sampleRate=48000;this.state='running';this.destination={};}
-  get currentTime(){return mock.now/1000;}
+  constructor(){this.sampleRate=48000;this.state='running';}
+  get destination(){mock.outputAttempts++;throw Error('Игра подключила звуковой выход');}
   resume(){mock.resumed=true;return Promise.resolve();}
   close(){this.state='closed';return Promise.resolve();}
   createMediaStreamSource(){return {connect(target){if(!target.getFloatTimeDomainData)throw Error('Микрофон подключён к динамику');mock.connected++;},disconnect(){}};}
   createAnalyser(){return {set fftSize(n){mock.fftSize=n},get fftSize(){return mock.fftSize},disconnect(){},getFloatTimeDomainData(out){
    const f=440*2**((mock.midi-69)/12);for(let i=0;i<out.length;i++)out[i]=mock.level*Math.sin(2*Math.PI*f*i/48000);
   }};}
-  createOscillator(){const param={setValueAtTime(){},exponentialRampToValueAtTime(){}};return {frequency:param,connect(){},disconnect(){},start(){mock.sounds++},stop(){this.onended?.()}};}
-  createGain(){return {gain:{setValueAtTime(){},exponentialRampToValueAtTime(){}},connect(){},disconnect(){}};}
+  createOscillator(){mock.outputAttempts++;throw Error('Игра создала звуковой эффект');}
+  createBufferSource(){mock.outputAttempts++;throw Error('Игра создала звуковой эффект');}
  };
  `;
  frame=document.createElement('iframe');frame.style.cssText='width:768px;height:1024px;border:0';
@@ -115,16 +115,22 @@ try{
   }
  });
  await test('Интерфейс: отказ → повтор, микрофон, попадание и удержание',async()=>{
+  assert($('screenText').textContent.includes('ближайшую ноту справа от линии'),'На старте не объяснён выбор ноты');
   $('start').click();await until(()=>$('error').textContent.includes('запрещён'));
   assert(!$('start').disabled&&$('screenTitle').textContent==='Пауза','Нет повторного запуска');
   m.deny=false;$('start').click();await until(()=>m.connected===1);
   assert(m.resumed&&m.options.audio.echoCancellation===false&&m.options.audio.noiseSuppression===false&&m.options.audio.autoGainControl===false&&m.fftSize===4096,'Параметры микрофона');
-  m.step(0);m.step(2000);m.level=0;m.step(100);m.step(100);m.level=.2;
+  m.step(0);
+  const thrust=()=>$('ship').getAttribute('data-thrust'),initialThrust=thrust();
+  m.step(150);
+  assert(w.matchMedia('(prefers-reduced-motion: reduce)').matches?thrust()===initialThrust:thrust()!==initialThrust,'Выхлоп не учитывает настройку движения');
+  m.step(1850);m.level=0;m.step(100);m.step(100);m.level=.2;
   for(let i=0;i<3;i++)m.step();
   await until(async()=>(await w.SolfegeProgress.store.list()).length===1);
   assert($('answers').textContent==='1'&&$('streak').textContent==='1'&&$('accuracy').textContent==='100%','Попадание');
-  assert(d.querySelectorAll('.target-ring[visibility="visible"]').length===1,'Нет следующей цели');
-  assert(m.sounds>0,'Нет выстрела');
+  assert(d.querySelectorAll('.note.moving').length===1&&!$('notes').querySelector('circle'),'Нет следующей ноты или осталась обводка');
+  assert($('effects').querySelector('.beam-fx')&&$('effects').querySelector('.score-fx').textContent==='+1','Нет визуального выстрела или очка');
+  assert(w.getComputedStyle(d.querySelector('.staff-lines')).stroke==='rgb(0, 0, 0)'&&w.getComputedStyle(d.querySelector('.staff-key')).fill==='rgb(0, 0, 0)'&&w.getComputedStyle(d.querySelector('.note ellipse')).fill==='rgb(0, 0, 0)'&&w.getComputedStyle($('stage')).backgroundColor==='rgb(255, 255, 255)','Нет чёрной нотации на белом фоне');
   for(let i=0;i<60;i++)m.step();
   assert((await w.SolfegeProgress.store.list()).length===1,'Удержание стало новым ответом');
  });
@@ -133,20 +139,29 @@ try{
   for(let i=0;i<3;i++)m.step();
   await until(async()=>(await w.SolfegeProgress.store.list()).length===2);
   assert($('hint').textContent.includes('Вы сыграли')&&d.querySelector('.note.doomed'),'Неверный ответ');
-  assert(d.querySelector('.target-ring[visibility="visible"]'),'Следующая цель не активна');
+  assert(d.querySelector('.note.moving')&&!$('notes').querySelector('circle'),'Нет следующей ноты или осталась обводка');
   assert($('hearts').getAttribute('aria-label')==='Жизни: 3','Жизнь потеряна до столкновения');
+  const label=()=>$('effects').querySelector('[data-outcome="wrong"]');
+  assert(label()?.textContent==='ре · 1-я октава'&&$('hint').textContent.includes(label().textContent),'Не показана правильная нота');
+  const initialY=+label().getAttribute('y'),bounds=label().getBBox();
+  assert(bounds.x>=0&&bounds.x+bounds.width<=$('stage').clientWidth,'Подпись обрезана у правого края');
   m.step(300);assert($('hearts').getAttribute('aria-label')==='Жизни: 3','Слишком ранний удар');
+  if(!w.matchMedia('(prefers-reduced-motion: reduce)').matches)assert(+label().getAttribute('y')<initialY,'Подпись не поднимается');
   m.step(300);assert($('hearts').getAttribute('aria-label')==='Жизни: 2'&&$('stage').classList.contains('shake'),'Нет взрыва и потери жизни');
+  assert($('effects').querySelector('.burst-fx .pixel-particle'),'Нет пиксельного взрыва');
   assert($('accuracy').textContent==='50%'&&$('streak').textContent==='0','Точность и серия');
  });
  await test('Интерфейс: тайм-ауты, итоги, один ответ на ноту и рекорд',async()=>{
-  m.level=0;m.step(20000);await until(()=>$('screenTitle').textContent==='Игра окончена');
+  m.level=0;m.step(9020-m.now);
+  assert($('effects').querySelector('[data-outcome="timeout"]')?.textContent==='до · 1-я октава','Нет правильной ноты после пропуска');
+  m.step(20000);await until(()=>$('screenTitle').textContent==='Игра окончена');
   const rows=await w.SolfegeProgress.store.list();
   assert(rows.length===4&&rows.filter(r=>r.task.endsWith(':timeout')).length===2,'Нет отдельных тайм-аутов');
   assert(rows.every(r=>r.exercise==='note-shooter'&&r.mode.clef==='treble'&&r.mode.direction.includes('80')),'ID и режим');
   assert($('result').textContent.includes('Счёт: 1')&&$('result').textContent.includes('25%'),'Итоги');
   assert(m.values.get('solfege-note-shooter-best')==='1'&&$('best').textContent==='1','Рекорд не сохранён');
   assert(m.stopped===1&&!m.callbacks.size,'Микрофон не выключен');
+  assert(m.outputAttempts===0&&!$('sounds'),'Игра пытается воспроизвести звук');
   assert(!$('settingsBox').hidden&&$('start').textContent==='Ещё раз','Нет настроек и повтора');
  });
  await test('Повтор, пауза, восстановление и отключённый трек',async()=>{
@@ -155,7 +170,8 @@ try{
   $('start').click();await until(()=>m.connected===2);
   assert(m.fftSize===8192&&$('answers').textContent==='0'&&$('best').textContent==='1','Новая игра');
   m.step(0);m.step(1000);$('pause').click();
-  const before=$('notes').innerHTML;m.step(20000);assert($('notes').innerHTML===before&&m.stopped===2,'Пауза');
+  const before=$('notes').innerHTML,thrust=$('ship').getAttribute('data-thrust');m.step(20000);
+  assert($('notes').innerHTML===before&&$('ship').getAttribute('data-thrust')===thrust&&m.stopped===2,'Движение на паузе');
   $('start').click();await until(()=>m.connected===3);m.step(0);
   assert($('notes').innerHTML===before,'Скачок после возобновления');
   m.midi=40;m.level=.2;for(let i=0;i<3;i++)m.step();
