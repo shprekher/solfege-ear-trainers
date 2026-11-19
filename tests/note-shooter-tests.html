@@ -7,8 +7,8 @@
 const results=[],assert=(ok,message)=>{if(!ok)throw Error(message);},near=(a,b,epsilon=1e-7)=>Math.abs(a-b)<epsilon;
 async function test(name,fn){try{await fn();results.push({name,ok:true});}catch(error){results.push({name,ok:false,error:error.message});}}
 const until=async fn=>{const limit=performance.now()+6000;while(!await fn()){if(performance.now()>limit)throw Error('Истекло время ожидания');await new Promise(r=>setTimeout(r,20));}};
-function pianoFrame(out,rate,midi,age,previous=.08){
- const f=440*2**((midi-69)/12),partials=[.64,.85,.46,.36,.20].map((volume,i)=>[volume,2*Math.PI*f*(i+1)*Math.sqrt(1+.0002*(i+1)**2)]);
+function pianoFrame(out,rate,midi,age,previous=.08,detune=0){
+ const f=440*2**((midi-69)/12)*2**(detune/1200),partials=[.64,.85,.46,.36,.20].map((volume,i)=>[volume,2*Math.PI*f*(i+1)*Math.sqrt(1+.0002*(i+1)**2)]);
  let seed=179;
  for(let i=0;i<out.length;i++){
   const t=(i-out.length)/rate+age;
@@ -249,13 +249,13 @@ try{
    assert(get('answers').textContent==='0'&&get('screenTitle').textContent==='Нотная аркада','Восстановлена незавершённая игра');
   }finally{await reopened.contentWindow.SolfegeProgress.store.close();reopened.remove();}
  });
- await test('Аркада засчитывает соль и си второй октавы подряд, без паузы в 700 мс',async()=>{
+ await test('Аркада засчитывает соль второй октавы с растянутым строем и си подряд',async()=>{
   $('clef').value='treble';$('range').value='extended';$('bpm').value='80';
   let draws=0;w.Math.random=()=>draws++===0?12.2/15:13.2/14;
   m.defer=false;m.level=0;$('start').click();await until(()=>m.connected===5);
   m.step(0);m.step(1600);
   const first= m.now-20;
-  m.fill=out=>pianoFrame(out,48000,79,(m.now-first)/1000);
+  m.fill=out=>pianoFrame(out,48000,79,(m.now-first)/1000,0,55);
   m.step(15);
   assert(!$('heard').textContent.includes('соль')&&$('answers').textContent==='0','Один кадр показан как подтверждённый ответ');
   for(let i=0;i<5&&$('answers').textContent==='0';i++)m.step(15);

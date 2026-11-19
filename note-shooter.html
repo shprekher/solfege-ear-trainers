@@ -168,7 +168,7 @@ for(const id of ['clef','range','bpm'])$(id).addEventListener('change',()=>{
 let game=null,view='start',frame=0,lastFrame=null,generation=0,context=null,stream=null,source=null,analyser=null;
 const pitchProfile=Object.freeze({minClarity:.88,window:6,minHits:2});
 let buffer,recent,detect,stable=P.vote(pitchProfile),attack=P.onset(),noise=P.noiseFloor({minThreshold:.0022,multiplier:2.5}),muteUntil=0,lastLevel=0;
-let confirmed=null,confirmedUntil=0;
+let confirmed=null,confirmedUntil=0,targetHits=0;
 let fx=[],noteNodes=new Map(),geometry={width:1,height:1};
 const svgNS='http://www.w3.org/2000/svg';
 const reducedMotion=matchMedia('(prefers-reduced-motion: reduce)');
@@ -202,7 +202,7 @@ function saveBest(){
 }
 function blockMic(){
  const now=(game?.time||0)*1000;
- muteUntil=Math.max(muteUntil,now+CONFIG.cooldownMs);attack.block(now,Math.max(lastLevel,.003),muteUntil-now);stable.reset();
+ muteUntil=Math.max(muteUntil,now+CONFIG.cooldownMs);attack.block(now,Math.max(lastLevel,.003),muteUntil-now);stable.reset();targetHits=0;
 }
 function onVerdict(event){
  const {note,outcome,actual}=event;
@@ -245,7 +245,7 @@ function endGame(){
 }
 function newGame(){
  progress.reset();fx=[];noteNodes.clear();$('notes').replaceChildren();$('stage').classList.remove('shake');
- stable.reset();attack=P.onset();noise=P.noiseFloor({minThreshold:.0022,multiplier:2.5});muteUntil=0;lastLevel=0;
+ stable.reset();attack=P.onset();noise=P.noiseFloor({minThreshold:.0022,multiplier:2.5});muteUntil=0;lastLevel=0;targetHits=0;
  confirmed=null;confirmedUntil=0;
  game=createGame(readSettings(),{best:allTimeBest,onVerdict,onCollision});game.pause();stats();layout();render();
 }
@@ -284,12 +284,25 @@ function hear(){
  const showWaiting=text=>{$('heard').textContent=confirmed!==null&&now<confirmedUntil?'Слышу: '+noteName(confirmed):text;};
  if(now<muteUntil){showWaiting('Жду нового нажатия');return;}
  const pitch=detect(buffer,context.sampleRate),threshold=noise.update(lastLevel,pitch.clarity);
- if(!attack.update(now,lastLevel,threshold/3)){stable.reset();showWaiting('Жду нового нажатия');return;}
+ if(!attack.update(now,lastLevel,threshold/3)){stable.reset();targetHits=0;showWaiting('Жду нового нажатия');return;}
+ const target=game.target();
+ // Compare with the requested note directly. A stretch-tuned or slightly
+ // sharp high string can sit near the boundary between MIDI numbers; two
+ // frames within 70 cents still identify the intended key unambiguously.
+ const fromTarget=target&&pitch.frequency?1200*Math.log2(pitch.frequency/P.frequency(target.midi)):Infinity;
+ if(target&&pitch.clarity>=pitchProfile.minClarity&&lastLevel>threshold&&Math.abs(fromTarget)<=70){
+  stable.reset();
+  if(++targetHits<2){showWaiting('Уточняю ноту…');return;}
+  confirmed=target.midi;confirmedUntil=now+320;showWaiting('');
+  const verdict=game.answer(target.midi,0);
+  if(!verdict)blockMic();
+  return;
+ }
+ targetHits=0;
  const accepted=stable.update(pitch,lastLevel,threshold,440,now);
  if(!accepted){showWaiting(pitch.frequency&&pitch.clarity>=pitchProfile.minClarity&&lastLevel>threshold?'Уточняю ноту…':'Слышу: —');return;}
- // Confirm the target from two matching frames; a wrong note needs three
- // so a chance high-register frame cannot cost a life.
- const target=game.target(),needed=target&&accepted.midi===target.midi?2:3;
+ // A wrong note needs three matching frames so a chance frame cannot cost a life.
+ const needed=target&&accepted.midi===target.midi?2:3;
  if(accepted.hits<needed){showWaiting('Уточняю ноту…');return;}
  const verdict=game.answer(accepted.midi,accepted.cents);
  if(!verdict){blockMic();showWaiting('Ждите следующую ноту');return;}
