@@ -1,0 +1,567 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#10141a">
+<title>Сыграй ноту — тренажёр</title>
+<style>
+:root{color-scheme:dark;--ink:#f1f4f6;--muted:#b4bec8;--accent:#b4dbca}
+*{box-sizing:border-box}body{margin:0;padding:max(12px,env(safe-area-inset-top)) 12px 20px;font:15px/1.4 -apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif;color:var(--ink);background:radial-gradient(ellipse at 50% -20%,#25363a,transparent 52%),#10141a;min-height:100svh}
+main{width:min(100%,600px);margin:auto}.card{position:relative;overflow:hidden;padding:20px;background:linear-gradient(180deg,#1d2630,#171e26);border:1px solid #3c454d;border-radius:22px;transition:box-shadow .15s}.card.good{box-shadow:inset 0 0 65px #4ede7555}.card.bad{box-shadow:inset 0 0 65px #ed546455}
+h1{font-size:27px;margin:8px 0}.sub,small{color:var(--muted)}p{margin:8px 0}a{color:var(--accent)}.back-link{font-size:13px}
+button,select,input{font:inherit}button,select{min-height:44px;border:1px solid #45535f;border-radius:10px;padding:8px;background:#111820;color:var(--ink)}button{cursor:pointer}button.primary{background:var(--accent);color:#122822;font-weight:700;flex:1}button:disabled{opacity:.55}button:focus-visible,a:focus-visible{outline:2px solid white;outline-offset:3px}
+.controls{display:flex;gap:8px;margin:12px 0}.settings-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}.settings-grid label{display:flex;flex-direction:column;gap:4px;font-size:13px}input[type=number]{width:100%;min-height:44px;background:#111820;color:var(--ink);border:1px solid #45535f;border-radius:10px;padding:8px}details{margin:10px 0}summary{cursor:pointer;min-height:36px}.check{display:block;margin-top:12px}
+.staff-area{height:220px;display:flex;align-items:center;justify-content:center}.staff-area svg{width:100%;height:100%;color:var(--ink)}.tuner{padding:12px;background:#111820;border:1px solid #38454e;border-radius:12px}.meter{height:7px;background:#38454e;border-radius:4px;overflow:hidden;margin-top:9px}.meter span{display:block;height:100%;width:0;background:var(--accent)}#heard{font-size:19px}.prompt{min-height:66px;margin-top:12px}#hint{font-weight:650}#error{color:#ffb8bf}#error:empty{display:none}
+.metrics{display:grid;grid-template-columns:repeat(4,1fr);gap:5px;text-align:center;margin:14px 0}.metric b{display:block;font-size:24px}.metric span{font-size:10px;color:var(--muted)}.bottom{display:flex;justify-content:space-between;align-items:center;gap:10px;font-size:13px}.credits{font-size:11px;color:var(--muted);margin-top:18px}
+.confetti-layer{position:absolute;inset:0;overflow:hidden;border-radius:inherit;pointer-events:none;z-index:2}.confetti-piece{position:absolute;left:var(--start-x);top:var(--start-y);width:var(--w);height:var(--h);border-radius:2px;background:var(--color);opacity:0;animation:confetti-burst 650ms cubic-bezier(.2,.72,.28,1) both}
+@keyframes confetti-burst{0%{opacity:1;transform:translate(-50%,-50%) rotate(0)}100%{opacity:0;transform:translate(calc(-50% + var(--dx)),calc(-50% + var(--dy))) rotate(var(--spin))}}
+@media(max-width:400px){.card{padding:12px}.staff-area{height:160px}h1{font-size:25px;margin:4px 0}.settings-grid{gap:8px}.prompt{min-height:50px}.metrics{margin:10px 0}.controls{margin:8px 0}}
+@media(prefers-reduced-motion:reduce){.confetti-piece{animation:none}.card{transition:none}}
+</style>
+</head>
+<body><main>
+<section class="card" id="card" aria-label="Сыграй ноту">
+<a class="back-link" href="./index.html">← К упражнениям</a>
+<h1>Сыграй ноту</h1><p class="sub">Прочитайте ноту и сыграйте её на пианино.</p>
+<details id="settings"><summary>Настройки</summary><div class="settings-grid">
+<label>Ключ<select id="clef"><option value="treble">Скрипичный</option><option value="bass">Басовый</option><option value="both">Оба ключа</option></select></label>
+<label>Диапазон<select id="range"><option value="beginner">C3–C5</option><option value="extended">C2–C6</option></select></label>
+<label>Ля первой октавы, Гц<input id="a4" type="number" min="400" max="480" step="1" value="440"></label>
+<label>Допуск, центы<input id="tolerance" type="number" min="5" max="50" step="1" value="50"></label>
+</div><label class="check"><input id="accidentals" type="checkbox"> Диезы и бемоли</label>
+<label class="check"><input id="sounds" type="checkbox" checked> Звуковой сигнал</label>
+<label class="check"><input id="timerVisible" type="checkbox" checked> Показывать время</label>
+<small>Скрипичный ключ: C4 и выше; басовый: ниже C4. Выбранный диапазон ограничивается этим разделением. В режиме «Оба» используются оба стана. Играйте одну ноту без педали. После ответа отпустите клавишу, дождитесь затихания и сыграйте заново. При смене диапазона микрофон нужно запустить снова.</small></details>
+<div class="staff-area" id="orb"><svg id="staff" viewBox="0 0 300 190" role="img" aria-label="Нота для игры"><g id="drawing"></g></svg></div>
+<div class="tuner"><span id="heard">Микрофон выключен</span><div class="meter" role="meter" aria-label="Уровень микрофона" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" id="meter"><span id="level"></span></div></div>
+<div class="prompt" aria-live="polite"><p id="hint">Нажмите «Старт» и разрешите микрофон.</p><p id="error" role="alert"></p></div>
+<div class="controls"><button class="primary" id="start">Старт</button><button id="stop" disabled>Стоп</button></div>
+<div class="confetti-layer" id="confetti" aria-hidden="true"></div>
+</section>
+<div class="metrics"><div class="metric"><b id="answers">0</b><span>ОТВЕТОВ</span></div><div class="metric"><b id="streak">0</b><span>СЕРИЯ</span></div><div class="metric"><b id="accuracy">—</b><span>ТОЧНОСТЬ</span></div><div class="metric"><b id="best">0</b><span>РЕКОРД</span></div></div>
+<div class="bottom"><span id="timer">Время: 0:00</span><a href="./progress.html">Мой прогресс</a><button id="reset">Сбросить</button></div>
+<p class="credits">Звук пианино: TimGM6mb (Тим Брекбилл и Дэвид Болтон), GPL-2.0. Сэмпл из «Чтения нот». Лицензия и атрибуция: <a href="./THIRD_PARTY_LICENSES.md">THIRD_PARTY_LICENSES.md</a>.</p>
+</main>
+<script src="./progress-store.js"></script><script src="./pitch-detector.js"></script>
+<script>
+(() => {
+'use strict';
+const $ = id => document.getElementById(id), P = window.PitchDetector;
+const progress = window.SolfegeProgress.tracker('play-the-note');
+const settingIds = ['clef','range','a4','tolerance','accidentals','sounds','timerVisible'];
+const key = 'solfege-play-the-note-settings';
+try {
+ const saved = JSON.parse(localStorage.getItem(key) || '{}');
+ for (const id of settingIds) if (Object.hasOwn(saved,id)) {
+  if ($(id).type === 'checkbox') $(id).checked = saved[id] === true;
+  else if (id === 'clef' && ['treble','bass','both'].includes(saved[id]) || id === 'range' && ['beginner','extended'].includes(saved[id])) $(id).value = saved[id];
+  else if (['a4','tolerance'].includes(id) && Number.isFinite(+saved[id]) && +saved[id] >= +$(id).min && +saved[id] <= +$(id).max) $(id).value = saved[id];
+ }
+} catch { /* Settings are optional; history has its own warning. */ }
+function settings() { return {clef:$('clef').value,range:$('range').value,a4:+$('a4').value,tolerance:+$('tolerance').value,accidentals:$('accidentals').checked}; }
+let current = null, previous = null, running = false, generation = 0, context = null, stream = null, source = null, analyser = null;
+let frame = 0, feedbackTimer = null, feedbackUntil = 0, player = null, pianoBuffer = null, buffer, detect, stable, attack, noise;
+let total = 0, correct = 0, streak = 0, best = 0, elapsed = 0, started = 0;
+const natural = [0,2,4,5,7,9,11], names = ['до','ре','ми','фа','соль','ля','си'];
+function spelling(midi, flat = false) {
+ const pc = midi % 12, octave = Math.floor(midi / 12) - 1;
+ let index = natural.indexOf(pc), accidental = '';
+ if (index < 0) { const base = pc + (flat ? 1 : -1); index = natural.indexOf(base); accidental = flat ? '♭' : '♯'; }
+ return {index,octave,accidental,label:names[index] + accidental + ' (' + octave + ')'};
+}
+function newCard() {
+ const s = settings(), low = s.range === 'extended' ? 36 : 48, high = s.range === 'extended' ? 84 : 72;
+ const clef = s.clef === 'both' ? (Math.random()<.5?'treble':'bass') : s.clef;
+ const notes = [];
+ for (let n = low; n <= high; n++) {
+  // Use normal piano notation in every mode, not extreme ledger-line drills.
+  if (clef === 'treble' ? n < 60 : n >= 60) continue;
+  if ((s.accidentals || natural.includes(n % 12)) && n !== previous) notes.push(n);
+ }
+ const midi = notes[Math.floor(Math.random() * notes.length)];
+ current = {midi,clef,spelling:spelling(midi,Math.random()<.5),recorded:false,settings:s}; previous = midi;
+ render(); $('hint').textContent = 'Сыграйте ноту. После ответа отпустите клавишу.'; $('card').classList.remove('good','bad');
+}
+function render() {
+ const {clef,spelling:n} = current, base = clef === 'treble' ? 4*7+2 : 2*7+4;
+ const grand = current.settings.clef === 'both', offset = grand && clef === 'bass' ? 90 : 0;
+ // E4 / G2 on the bottom staff line; one diatonic step = 5 SVG units.
+ const y = 110 + offset - ((n.octave*7+n.index)-base)*5;
+ const top = Math.min(40,y-38), bottom = Math.max(grand?230:140,y+38);
+ $('staff').setAttribute('viewBox',`0 ${top} 300 ${bottom-top}`);
+ let lines = '', clefs = '';
+ for (const [key,shift] of grand ? [['treble',0],['bass',90]] : [[clef,0]]) {
+  for (let yy=70+shift;yy<=110+shift;yy+=10) lines+=`M25 ${yy}H280 `;
+  clefs+=`<text x="38" y="${(key==='treble'?104:99)+shift}" font-size="43" font-family="Bravura, Noto Music, Apple Symbols, serif" fill="currentColor">${key==='treble'?'𝄞':'𝄢'}</text>`;
+ }
+ let ledger = '';
+ for(let yy=120+offset;yy<=y;yy+=10) ledger+=`M176 ${yy}H210 `;
+ for(let yy=60+offset;yy>=y;yy-=10) ledger+=`M176 ${yy}H210 `;
+ const stem = y < 90+offset ? `M185 ${y}v32` : `M201 ${y}v-32`;
+ $('drawing').innerHTML = `<g stroke="currentColor" stroke-width="1.3" fill="none"><path d="${lines}"/><path d="${ledger}"/><path d="${stem}"/>${grand?'<path d="M22 70V200"/>':''}</g>${clefs}<text x="163" y="${y+5}" font-size="23" fill="currentColor">${n.accidental}</text><ellipse cx="193" cy="${y}" rx="9" ry="5.5" transform="rotate(-18 193 ${y})" fill="currentColor"/>`;
+ $('staff').setAttribute('aria-label','Нота для игры, '+(clef==='treble'?'скрипичный':'басовый')+' ключ');
+}
+function stats() {
+ $('answers').textContent=total; $('streak').textContent=streak; $('best').textContent=best; $('accuracy').textContent=total?Math.round(correct/total*100)+'%':'—';
+}
+function time(now) {
+ const seconds=Math.floor((elapsed+(running?now-started:0))/1000);
+ $('timer').textContent=`Время: ${Math.floor(seconds/60)}:${String(seconds%60).padStart(2,'0')}`;
+}
+let confettiTimer = null;
+function clearConfetti(){clearTimeout(confettiTimer);$('confetti').replaceChildren();}
+function burstConfetti(){
+ clearConfetti();if(matchMedia('(prefers-reduced-motion: reduce)').matches)return;
+ const area=$('confetti'),bounds=area.getBoundingClientRect(),orb=$('orb').getBoundingClientRect();
+ const x=orb.left-bounds.left+orb.width/2,y=orb.top-bounds.top+orb.height/2;
+ const colors=['#b9f7ce','#f8d36c','#f4a0b5','#95c6ff','#ddd1ff','#ffffff'],frag=document.createDocumentFragment();
+ for(let i=0;i<28;i++){
+  const particle=document.createElement('i');particle.className='confetti-piece';const angle=2*Math.PI*i/28+(Math.random()-.5)*.34,radius=85+Math.random()*125;
+  for(const [k,v] of Object.entries({'start-x':x+'px','start-y':y+'px',dx:Math.round(Math.cos(angle)*radius)+'px',dy:Math.round(Math.sin(angle)*radius+27)+'px',spin:Math.round((Math.random()-.5)*960)+'deg',w:(4+Math.random()*3)+'px',h:(7+Math.random()*5)+'px',color:colors[i%colors.length]})) particle.style.setProperty('--'+k,v);
+  particle.style.animationDelay=Math.floor(Math.random()*60)+'ms';frag.append(particle);
+ }area.append(frag);confettiTimer=setTimeout(clearConfetti,760);
+}
+const PIANO_SAMPLE = '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';
+function sound() {
+ if (!$('sounds').checked || !pianoBuffer || context?.state !== 'running') return;
+ const audio=context.createBufferSource(),gain=context.createGain();
+ audio.buffer=pianoBuffer;gain.gain.value=.3;audio.connect(gain);gain.connect(context.destination);player=audio;
+ audio.onended=()=>{audio.disconnect();gain.disconnect();if(player===audio)player=null;};
+ // Acoustic feedback must be silent well before the input gate reopens.
+ audio.start();audio.stop(context.currentTime+.3);
+}
+function verdict(n,level,now) {
+ const s=current.settings, cents=1200*Math.log2(P.frequency(n.midi,s.a4)/P.frequency(current.midi,s.a4))+n.cents;
+ const ok=n.midi===current.midi && Math.abs(cents)<=s.tolerance;
+ if(!current.recorded){
+  current.recorded=true;total++;if(ok){correct++;streak++;best=Math.max(best,streak);}else streak=0;stats();
+  const mode=[s.clef==='both'?'Оба':s.clef==='bass'?'Бас':'Скрип',s.range==='extended'?'C2–C6':'C3–C5',s.accidentals?'♯/♭':'Без знаков'].join(' · ');
+  progress.record({correct:ok,task:String(current.midi),mode:{direction:mode},expected:current.spelling.label,actual:spelling(n.midi).label});
+ }
+ $('card').classList.remove('good','bad');$('card').classList.add(ok?'good':'bad');
+ $('hint').textContent=ok?'Верно!':`Вы сыграли: ${spelling(n.midi).label}${n.midi===current.midi?' — проверьте настройку инструмента.':''}`;
+ feedbackUntil=now+700;attack.block(now,level);stable.reset();
+ if(ok){burstConfetti();sound();}
+ feedbackTimer=setTimeout(()=>{feedbackTimer=null;if(!running)return;if(ok)newCard();else{$('card').classList.remove('bad');}},700);
+}
+function loop(now) {
+ if(!running)return;
+ try {
+  analyser.getFloatTimeDomainData(buffer);
+  const level=P.rms(buffer),percent=Math.min(100,Math.round(level*700));
+  $('level').style.width=percent+'%';$('meter').setAttribute('aria-valuenow',percent);time(now);
+  if(now>=feedbackUntil){
+   const pitch=detect(buffer,context.sampleRate),threshold=noise.update(level,pitch.clarity);
+   const n=P.note(pitch.frequency,settings().a4);
+   $('heard').textContent=n&&pitch.clarity>=.90&&level>threshold?`${spelling(n.midi).label} · ${n.cents>0?'+':''}${Math.round(n.cents)} ц`:'Слушаю…';
+   if(attack.update(now,level,threshold/3)){
+    const accepted=stable.update(pitch,level,threshold,current.settings.a4);
+    if(accepted)verdict(accepted,level,now);
+   }else stable.reset();
+  }
+  frame=requestAnimationFrame(loop);
+ }catch{fail('Микрофон прерван. Нажмите «Повторить».');}
+}
+function stop(message='Микрофон выключен') {
+ generation++;if(running)elapsed+=performance.now()-started;running=false;
+ cancelAnimationFrame(frame);clearTimeout(feedbackTimer);feedbackTimer=null;clearConfetti();
+ if(player){player.stop();player=null;}pianoBuffer=null;
+ if(stream){for(const t of stream.getTracks()){t.onended=null;t.onmute=null;t.stop();}stream=null;}
+ if(source){source.disconnect();source=null;}if(analyser){analyser.disconnect();analyser=null;}
+ if(context){const old=context;context=null;old.onstatechange=null;old.close().catch(()=>{});}
+ $('start').disabled=false;$('stop').disabled=true;$('heard').textContent=message;$('level').style.width='0';$('meter').setAttribute('aria-valuenow','0');time(performance.now());
+}
+function fail(message){stop();$('error').textContent=message;$('start').textContent='Повторить';}
+$('start').onclick=async()=>{
+ if(running)return;
+ if(!window.isSecureContext){fail('Для микрофона нужен HTTPS. На компьютере также работает localhost, но не обычный HTTP по адресу локальной сети.');return;}
+ if(!navigator.mediaDevices?.getUserMedia){fail('Браузер не поддерживает микрофон. Откройте страницу в Safari или Chrome и повторите.');return;}
+ if(!['a4','tolerance'].every(id=>$(id).reportValidity()))return;
+ const token=++generation;$('start').disabled=true;$('stop').disabled=false;$('error').textContent='';$('heard').textContent='Разрешите доступ к микрофону…';
+ try {
+  context=new (window.AudioContext||window.webkitAudioContext)();
+  // Both calls are initiated synchronously during this user gesture.
+  const active=context,resumed=active.resume();
+  resumed.catch(()=>{});
+  const bytes=Uint8Array.from(atob(PIANO_SAMPLE),c=>c.charCodeAt(0));
+  active.decodeAudioData(bytes.buffer).then(value=>{if(context===active)pianoBuffer=value;},()=>{});
+  const pending=navigator.mediaDevices.getUserMedia({audio:{echoCancellation:false,noiseSuppression:false,autoGainControl:false,channelCount:1}});
+  const acquired=await pending;
+  if(token!==generation){acquired.getTracks().forEach(t=>t.stop());return;}
+  stream=acquired;await resumed;
+  if(token!==generation)return;
+  if(document.hidden){stop();return;}
+  analyser=active.createAnalyser();analyser.fftSize=settings().range==='extended'?8192:4096;analyser.smoothingTimeConstant=0;
+  source=active.createMediaStreamSource(stream);source.connect(analyser); // No connection to destination.
+  buffer=new Float32Array(analyser.fftSize);detect=P.detector();stable=P.stability();attack=P.onset();noise=P.noiseFloor();feedbackUntil=0;
+  for(const t of stream.getAudioTracks()){t.onended=t.onmute=()=>fail('Микрофон отключён или прерван. Проверьте доступ и нажмите «Повторить».');}
+  active.onstatechange=()=>{if(running&&active.state!=='running')fail('Звук прерван системой. Нажмите «Повторить».');};
+  running=true;started=performance.now();$('start').textContent='Старт';
+  if(!current)newCard();else $('hint').textContent='Сыграйте ноту заново.';
+  frame=requestAnimationFrame(loop);
+ }catch(error){if(token===generation)fail(error.name==='NotAllowedError'?'Доступ к микрофону запрещён. Разрешите его в настройках сайта и нажмите «Повторить».':error.name==='NotFoundError'?'Микрофон не найден. Подключите его и повторите.':'Не удалось запустить микрофон. Закройте другие приложения со звуком и нажмите «Повторить».');}
+};
+$('stop').onclick=()=>stop();
+document.addEventListener('visibilitychange',()=>{if(document.hidden){stop('Пауза: нажмите «Старт» после возвращения.');}});
+window.addEventListener('pagehide',()=>stop());
+for(const id of settingIds)$(id).addEventListener('change',()=>{
+ if(!['a4','tolerance'].every(k=>$(k).checkValidity()))return;
+ try{localStorage.setItem(key,JSON.stringify(Object.fromEntries(settingIds.map(k=>[k,$(k).type==='checkbox'?$(k).checked:$(k).value]))));}catch{}
+ $('timer').hidden=!$('timerVisible').checked;
+ if(['clef','range','accidentals','a4','tolerance'].includes(id)){stop();newCard();}
+});
+$('reset').onclick=()=>{stop();total=correct=streak=best=elapsed=0;progress.reset();stats();time(0);newCard();};
+$('timer').hidden=!$('timerVisible').checked;
+newCard();
+$('hint').textContent='Нажмите «Старт» и разрешите микрофон.';
+})();
+</script></body>
+<!--
+PIANO SAMPLE LICENSING
+TimGM6mb by Tim Brechbill and David Bolton, GNU GPL version 2.
+The audio samples included here were generated by playing the acoustic-grand
+preset of TimGM6mb with FluidSynth, trimmed and re-encoded into mono MP3.
+SoundFont provenance: https://www.timbrechbill.com/soundfonts/
+
+                    GNU GENERAL PUBLIC LICENSE
+                       Version 2, June 1991
+
+ Copyright (C) 1989, 1991 Free Software Foundation, Inc.,
+ <https://fsf.org/>
+ Everyone is permitted to copy and distribute verbatim copies
+ of this license document, but changing it is not allowed.
+
+                            Preamble
+
+  The licenses for most software are designed to take away your
+freedom to share and change it.  By contrast, the GNU General Public
+License is intended to guarantee your freedom to share and change free
+software--to make sure the software is free for all its users.  This
+General Public License applies to most of the Free Software
+Foundation's software and to any other program whose authors commit to
+using it.  (Some other Free Software Foundation software is covered by
+the GNU Lesser General Public License instead.)  You can apply it to
+your programs, too.
+
+  When we speak of free software, we are referring to freedom, not
+price.  Our General Public Licenses are designed to make sure that you
+have the freedom to distribute copies of free software (and charge for
+this service if you wish), that you receive source code or can get it
+if you want it, that you can change the software or use pieces of it
+in new free programs; and that you know you can do these things.
+
+  To protect your rights, we need to make restrictions that forbid
+anyone to deny you these rights or to ask you to surrender the rights.
+These restrictions translate to certain responsibilities for you if you
+distribute copies of the software, or if you modify it.
+
+  For example, if you distribute copies of such a program, whether
+gratis or for a fee, you must give the recipients all the rights that
+you have.  You must make sure that they, too, receive or can get the
+source code.  And you must show them these terms so they know their
+rights.
+
+  We protect your rights with two steps: (1) copyright the software, and
+(2) offer you this license which gives you legal permission to copy,
+distribute and/or modify the software.
+
+  Also, for each author's protection and ours, we want to make certain
+that everyone understands that there is no warranty for this free
+software.  If the software is modified by someone else and passed on, we
+want its recipients to know that what they have is not the original, so
+that any problems introduced by others will not reflect on the original
+authors' reputations.
+
+  Finally, any free program is threatened constantly by software
+patents.  We wish to avoid the danger that redistributors of a free
+program will individually obtain patent licenses, in effect making the
+program proprietary.  To prevent this, we have made it clear that any
+patent must be licensed for everyone's free use or not licensed at all.
+
+  The precise terms and conditions for copying, distribution and
+modification follow.
+
+                    GNU GENERAL PUBLIC LICENSE
+   TERMS AND CONDITIONS FOR COPYING, DISTRIBUTION AND MODIFICATION
+
+  0. This License applies to any program or other work which contains
+a notice placed by the copyright holder saying it may be distributed
+under the terms of this General Public License.  The "Program", below,
+refers to any such program or work, and a "work based on the Program"
+means either the Program or any derivative work under copyright law:
+that is to say, a work containing the Program or a portion of it,
+either verbatim or with modifications and/or translated into another
+language.  (Hereinafter, translation is included without limitation in
+the term "modification".)  Each licensee is addressed as "you".
+
+Activities other than copying, distribution and modification are not
+covered by this License; they are outside its scope.  The act of
+running the Program is not restricted, and the output from the Program
+is covered only if its contents constitute a work based on the
+Program (independent of having been made by running the Program).
+Whether that is true depends on what the Program does.
+
+  1. You may copy and distribute verbatim copies of the Program's
+source code as you receive it, in any medium, provided that you
+conspicuously and appropriately publish on each copy an appropriate
+copyright notice and disclaimer of warranty; keep intact all the
+notices that refer to this License and to the absence of any warranty;
+and give any other recipients of the Program a copy of this License
+along with the Program.
+
+You may charge a fee for the physical act of transferring a copy, and
+you may at your option offer warranty protection in exchange for a fee.
+
+  2. You may modify your copy or copies of the Program or any portion
+of it, thus forming a work based on the Program, and copy and
+distribute such modifications or work under the terms of Section 1
+above, provided that you also meet all of these conditions:
+
+    a) You must cause the modified files to carry prominent notices
+    stating that you changed the files and the date of any change.
+
+    b) You must cause any work that you distribute or publish, that in
+    whole or in part contains or is derived from the Program or any
+    part thereof, to be licensed as a whole at no charge to all third
+    parties under the terms of this License.
+
+    c) If the modified program normally reads commands interactively
+    when run, you must cause it, when started running for such
+    interactive use in the most ordinary way, to print or display an
+    announcement including an appropriate copyright notice and a
+    notice that there is no warranty (or else, saying that you provide
+    a warranty) and that users may redistribute the program under
+    these conditions, and telling the user how to view a copy of this
+    License.  (Exception: if the Program itself is interactive but
+    does not normally print such an announcement, your work based on
+    the Program is not required to print an announcement.)
+
+These requirements apply to the modified work as a whole.  If
+identifiable sections of that work are not derived from the Program,
+and can be reasonably considered independent and separate works in
+themselves, then this License, and its terms, do not apply to those
+sections when you distribute them as separate works.  But when you
+distribute the same sections as part of a whole which is a work based
+on the Program, the distribution of the whole must be on the terms of
+this License, whose permissions for other licensees extend to the
+entire whole, and thus to each and every part regardless of who wrote it.
+
+Thus, it is not the intent of this section to claim rights or contest
+your rights to work written entirely by you; rather, the intent is to
+exercise the right to control the distribution of derivative or
+collective works based on the Program.
+
+In addition, mere aggregation of another work not based on the Program
+with the Program (or with a work based on the Program) on a volume of
+a storage or distribution medium does not bring the other work under
+the scope of this License.
+
+  3. You may copy and distribute the Program (or a work based on it,
+under Section 2) in object code or executable form under the terms of
+Sections 1 and 2 above provided that you also do one of the following:
+
+    a) Accompany it with the complete corresponding machine-readable
+    source code, which must be distributed under the terms of Sections
+    1 and 2 above on a medium customarily used for software interchange; or,
+
+    b) Accompany it with a written offer, valid for at least three
+    years, to give any third party, for a charge no more than your
+    cost of physically performing source distribution, a complete
+    machine-readable copy of the corresponding source code, to be
+    distributed under the terms of Sections 1 and 2 above on a medium
+    customarily used for software interchange; or,
+
+    c) Accompany it with the information you received as to the offer
+    to distribute corresponding source code.  (This alternative is
+    allowed only for noncommercial distribution and only if you
+    received the program in object code or executable form with such
+    an offer, in accord with Subsection b above.)
+
+The source code for a work means the preferred form of the work for
+making modifications to it.  For an executable work, complete source
+code means all the source code for all modules it contains, plus any
+associated interface definition files, plus the scripts used to
+control compilation and installation of the executable.  However, as a
+special exception, the source code distributed need not include
+anything that is normally distributed (in either source or binary
+form) with the major components (compiler, kernel, and so on) of the
+operating system on which the executable runs, unless that component
+itself accompanies the executable.
+
+If distribution of executable or object code is made by offering
+access to copy from a designated place, then offering equivalent
+access to copy the source code from the same place counts as
+distribution of the source code, even though third parties are not
+compelled to copy the source along with the object code.
+
+  4. You may not copy, modify, sublicense, or distribute the Program
+except as expressly provided under this License.  Any attempt
+otherwise to copy, modify, sublicense or distribute the Program is
+void, and will automatically terminate your rights under this License.
+However, parties who have received copies, or rights, from you under
+this License will not have their licenses terminated so long as such
+parties remain in full compliance.
+
+  5. You are not required to accept this License, since you have not
+signed it.  However, nothing else grants you permission to modify or
+distribute the Program or its derivative works.  These actions are
+prohibited by law if you do not accept this License.  Therefore, by
+modifying or distributing the Program (or any work based on the
+Program), you indicate your acceptance of this License to do so, and
+all its terms and conditions for copying, distributing or modifying
+the Program or works based on it.
+
+  6. Each time you redistribute the Program (or any work based on the
+Program), the recipient automatically receives a license from the
+original licensor to copy, distribute or modify the Program subject to
+these terms and conditions.  You may not impose any further
+restrictions on the recipients' exercise of the rights granted herein.
+You are not responsible for enforcing compliance by third parties to
+this License.
+
+  7. If, as a consequence of a court judgment or allegation of patent
+infringement or for any other reason (not limited to patent issues),
+conditions are imposed on you (whether by court order, agreement or
+otherwise) that contradict the conditions of this License, they do not
+excuse you from the conditions of this License.  If you cannot
+distribute so as to satisfy simultaneously your obligations under this
+License and any other pertinent obligations, then as a consequence you
+may not distribute the Program at all.  For example, if a patent
+license would not permit royalty-free redistribution of the Program by
+all those who receive copies directly or indirectly through you, then
+the only way you could satisfy both it and this License would be to
+refrain entirely from distribution of the Program.
+
+If any portion of this section is held invalid or unenforceable under
+any particular circumstance, the balance of the section is intended to
+apply and the section as a whole is intended to apply in other
+circumstances.
+
+It is not the purpose of this section to induce you to infringe any
+patents or other property right claims or to contest validity of any
+such claims; this section has the sole purpose of protecting the
+integrity of the free software distribution system, which is
+implemented by public license practices.  Many people have made
+generous contributions to the wide range of software distributed
+through that system in reliance on consistent application of that
+system; it is up to the author/donor to decide if he or she is willing
+to distribute software through any other system and a licensee cannot
+impose that choice.
+
+This section is intended to make thoroughly clear what is believed to
+be a consequence of the rest of this License.
+
+  8. If the distribution and/or use of the Program is restricted in
+certain countries either by patents or by copyrighted interfaces, the
+original copyright holder who places the Program under this License
+may add an explicit geographical distribution limitation excluding
+those countries, so that distribution is permitted only in or among
+countries not thus excluded.  In such case, this License incorporates
+the limitation as if written in the body of this License.
+
+  9. The Free Software Foundation may publish revised and/or new versions
+of the General Public License from time to time.  Such new versions will
+be similar in spirit to the present version, but may differ in detail to
+address new problems or concerns.
+
+Each version is given a distinguishing version number.  If the Program
+specifies a version number of this License which applies to it and "any
+later version", you have the option of following the terms and conditions
+either of that version or of any later version published by the Free
+Software Foundation.  If the Program does not specify a version number of
+this License, you may choose any version ever published by the Free Software
+Foundation.
+
+  10. If you wish to incorporate parts of the Program into other free
+programs whose distribution conditions are different, write to the author
+to ask for permission.  For software which is copyrighted by the Free
+Software Foundation, write to the Free Software Foundation; we sometimes
+make exceptions for this.  Our decision will be guided by the two goals
+of preserving the free status of all derivatives of our free software and
+of promoting the sharing and reuse of software generally.
+
+                            NO WARRANTY
+
+  11. BECAUSE THE PROGRAM IS LICENSED FREE OF CHARGE, THERE IS NO WARRANTY
+FOR THE PROGRAM, TO THE EXTENT PERMITTED BY APPLICABLE LAW.  EXCEPT WHEN
+OTHERWISE STATED IN WRITING THE COPYRIGHT HOLDERS AND/OR OTHER PARTIES
+PROVIDE THE PROGRAM "AS IS" WITHOUT WARRANTY OF ANY KIND, EITHER EXPRESSED
+OR IMPLIED, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF
+MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE.  THE ENTIRE RISK AS
+TO THE QUALITY AND PERFORMANCE OF THE PROGRAM IS WITH YOU.  SHOULD THE
+PROGRAM PROVE DEFECTIVE, YOU ASSUME THE COST OF ALL NECESSARY SERVICING,
+REPAIR OR CORRECTION.
+
+  12. IN NO EVENT UNLESS REQUIRED BY APPLICABLE LAW OR AGREED TO IN WRITING
+WILL ANY COPYRIGHT HOLDER, OR ANY OTHER PARTY WHO MAY MODIFY AND/OR
+REDISTRIBUTE THE PROGRAM AS PERMITTED ABOVE, BE LIABLE TO YOU FOR DAMAGES,
+INCLUDING ANY GENERAL, SPECIAL, INCIDENTAL OR CONSEQUENTIAL DAMAGES ARISING
+OUT OF THE USE OR INABILITY TO USE THE PROGRAM (INCLUDING BUT NOT LIMITED
+TO LOSS OF DATA OR DATA BEING RENDERED INACCURATE OR LOSSES SUSTAINED BY
+YOU OR THIRD PARTIES OR A FAILURE OF THE PROGRAM TO OPERATE WITH ANY OTHER
+PROGRAMS), EVEN IF SUCH HOLDER OR OTHER PARTY HAS BEEN ADVISED OF THE
+POSSIBILITY OF SUCH DAMAGES.
+
+                     END OF TERMS AND CONDITIONS
+
+            How to Apply These Terms to Your New Programs
+
+  If you develop a new program, and you want it to be of the greatest
+possible use to the public, the best way to achieve this is to make it
+free software which everyone can redistribute and change under these terms.
+
+  To do so, attach the following notices to the program.  It is safest
+to attach them to the start of each source file to most effectively
+convey the exclusion of warranty; and each file should have at least
+the "copyright" line and a pointer to where the full notice is found.
+
+    <one line to give the program's name and a brief idea of what it does.>
+    Copyright (C) <year>  <name of author>
+
+    This program is free software; you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation; either version 2 of the License, or
+    (at your option) any later version.
+
+    This program is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License along
+    with this program; if not, see <https://www.gnu.org/licenses/>.
+
+Also add information on how to contact you by electronic and paper mail.
+
+If the program is interactive, make it output a short notice like this
+when it starts in an interactive mode:
+
+    Gnomovision version 69, Copyright (C) year name of author
+    Gnomovision comes with ABSOLUTELY NO WARRANTY; for details type `show w'.
+    This is free software, and you are welcome to redistribute it
+    under certain conditions; type `show c' for details.
+
+The hypothetical commands `show w' and `show c' should show the appropriate
+parts of the General Public License.  Of course, the commands you use may
+be called something other than `show w' and `show c'; they could even be
+mouse-clicks or menu items--whatever suits your program.
+
+You should also get your employer (if you work as a programmer) or your
+school, if any, to sign a "copyright disclaimer" for the program, if
+necessary.  Here is a sample; alter the names:
+
+  Yoyodyne, Inc., hereby disclaims all copyright interest in the program
+  `Gnomovision' (which makes passes at compilers) written by James Hacker.
+
+  <signature of Moe Ghoul>, 1 April 1989
+  Moe Ghoul, President of Vice
+
+This General Public License does not permit incorporating your program into
+proprietary programs.  If your program is a subroutine library, you may
+consider it more useful to permit linking proprietary applications with the
+library.  If this is what you want to do, use the GNU Lesser General
+Public License instead of this License.
+
+-->
+</html>

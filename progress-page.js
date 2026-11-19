@@ -6,6 +6,7 @@
   const percent = rows => rows.length ? Math.round(rows.filter(a => a.correct).length / rows.length * 100) + '%' : '—';
   function status(text, error = false) { $('status').textContent = text; $('status').classList.toggle('error', error); }
   function modeLabel(mode, exercise) {
+    if (exercise === 'play-the-note') return mode.direction;
     const parts = [];
     if (mode.voices) parts.push(mode.voices + ' голоса');
     if (mode.clef) parts.push(mode.clef === 'bass' ? 'Басовый ключ' : 'Скрипичный ключ');
@@ -16,6 +17,7 @@
     return parts.join(' · ');
   }
   function taskLabel(answer) {
+    if (answer.exercise === 'play-the-note') return 'Сыграть: ' + answer.expected;
     if (answer.exercise === 'half-step') return answer.task === 'up' ? 'Второй звук выше' : 'Второй звук ниже';
     if (answer.exercise === 'count-notes') return answer.expected + ' ноты';
     if (answer.exercise === 'shifted-voice') return answer.expected;

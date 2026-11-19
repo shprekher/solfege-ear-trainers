@@ -52,6 +52,12 @@
         $('exercise').value = 'intervals-extended'; $('exercise').dispatchEvent(new win.Event('change'));
         assert($('level').textContent === '0%' && $('errors').textContent.includes('Большая секста ↓'), 'Нет отдельной статистики упражнения 6');
         results.push({ title: 'Отдельный прогресс упражнения 6 и подписи секст', ok: true });
+        await store.append({ ...records[0], id: 'exercise7', exercise: 'play-the-note', mode: { direction: 'Оба · C2–C6 · ♯/♭' }, task: '48', expected: 'до (3)', actual: 'ре (3)', correct: false });
+        doc.dispatchEvent(new win.Event('visibilitychange')); await wait(() => $('answers').textContent === '72');
+        $('exercise').value = 'play-the-note'; $('exercise').dispatchEvent(new win.Event('change'));
+        assert($('level').textContent === '0%' && $('errors').textContent.includes('Сыграть: до (3)'), 'Нет отдельной статистики микрофонного упражнения');
+        assert($('mode').textContent.includes('Оба · C2–C6 · ♯/♭'), 'Не показаны диапазон и знаки');
+        results.push({ title: 'Прогресс «Сыграй ноту», подписи задания и режима', ok: true });
       }
     } catch (error) { results.push({ title: 'Страница, ширина ' + width, ok: false, error: error.message }); }
     finally { await win.SolfegeProgress.store.close(); frame.remove(); }

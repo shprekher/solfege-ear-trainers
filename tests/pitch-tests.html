@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="ru"><head><meta charset="utf-8"><title>Проверки распознавания нот</title></head>
+<body><h1>Проверки распознавания нот</h1><pre id="results">Выполняются…</pre>
+<script src="../pitch-detector.js"></script><script src="../progress-store.js"></script>
+<script>
+(async()=>{
+'use strict';
+const P=PitchDetector,results=[],assert=(ok,message)=>{if(!ok)throw Error(message);};
+async function test(name,fn){try{await fn();results.push({name,ok:true});}catch(e){results.push({name,ok:false,error:e.message});}}
+function tone(midi,rate,size,harmonics=false,detune=0){
+ const out=new Float32Array(size),f=P.frequency(midi)*2**(detune/1200);
+ for(let i=0;i<size;i++){const x=2*Math.PI*f*i/rate;out[i]=harmonics?(.12*Math.sin(x)+.18*Math.sin(2*x)+.08*Math.sin(3*x)+.04*Math.sin(4*x))*Math.exp(-i/rate*2):.3*Math.sin(x);}
+ return out;
+}
+await test('Частота, MIDI, центы и настройка A4',()=>{
+ assert(P.note(440).midi===69&&P.note(440).cents===0,'A4');
+ for(const midi of [36,48,69,76,84])for(const cents of [-35,0,35]){
+  const n=P.note(P.frequency(midi,442)*2**(cents/1200),442);
+  assert(n.midi===midi&&Math.abs(n.cents-cents)<1e-8,'Преобразование частоты');
+ }
+ assert(P.note(0)===null&&P.note(NaN)===null,'Некорректная частота');
+});
+for(const rate of [32000,44100,48000,96000])for(const midi of [69,48,76,36])for(const harmonic of [false,true]){
+ await test(`${rate} Гц · MIDI ${midi} · ${harmonic?'пианино':'синус'}`,()=>{
+  const size=midi===36?8192:4096,detector=P.detector(),start=performance.now();
+  const pitch=detector(tone(midi,rate,size,harmonic),rate),n=P.note(pitch.frequency);
+  assert(n&&n.midi===midi&&Math.abs(n.cents)<5,JSON.stringify({pitch,n}));
+  assert(pitch.clarity>=.90,'Недостаточная ясность');
+  results.push({name:'Время детектора',ok:true,ms:performance.now()-start});
+ });
+}
+await test('Тишина и воспроизводимый белый шум отклоняются',()=>{
+ const detect=P.detector(),quiet=detect(new Float32Array(4096),48000);
+ assert(quiet.frequency===0,'Тишина');
+ let seed=12345;const noise=Float32Array.from({length:4096},()=>{seed=(1664525*seed+1013904223)>>>0;return (seed/2**32-.5)*.3;});
+ const pitch=detect(noise,48000);assert(pitch.clarity<.90,'Шум');
+});
+await test('Три кадра, ±20 центов, ясность и RMS',()=>{
+ const gate=P.stability(),pitch=(midi,cents=0,clarity=1)=>({frequency:P.frequency(midi)*2**(cents/1200),clarity});
+ assert(!gate.update(pitch(69),.1,.01),'Первый кадр');assert(!gate.update(pitch(69),.1,.01),'Второй');
+ assert(gate.update(pitch(69),.1,.01).midi===69,'Третий');
+ assert(!gate.update(pitch(70),.1,.01),'Смена ноты');assert(!gate.update(pitch(70,0,.89),.1,.01),'Ясность');
+ assert(!gate.update(pitch(69),.001,.01),'Тихий звук');
+ assert(!gate.update(pitch(69,-15),.1,.01),'Начало');
+ assert(!gate.update(pitch(69,15),.1,.01),'Разброс >20');assert(!gate.update(pitch(69,14),.1,.01),'Сброс счётчика');
+ assert(gate.update(pitch(69,13),.1,.01),'Стабильный звук');
+});
+await test('700 мс, удержание, спад и новая атака',()=>{
+ const a=P.onset();assert(a.update(0,.1,.001),'Начало');
+ a.block(0,.1);assert(!a.update(500,.001,.001),'Во время сигнала');
+ assert(!a.update(600,.1,.001),'Эхо сигнала');
+ for(let t=700;t<2000;t+=20)assert(!a.update(t,.1,.001),'Удержание');
+ assert(!a.update(2000,.005,.001),'Спад');assert(!a.update(2100,.005,.001),'Тихо');
+ assert(a.update(2120,.08,.001),'Новая атака');
+ a.block(2120,.08);assert(!a.update(3000,.08,.001),'Неверный ответ тоже требует новой атаки');
+});
+await test('Адаптивный порог не поглощает удерживаемую ноту',()=>{
+ const floor=P.noiseFloor();for(let i=0;i<1000;i++)floor.update(.1,1);
+ assert(floor.threshold<.01,'Удержание стало шумом');
+ for(let i=0;i<1000;i++)floor.update(.01,.1);
+ assert(floor.threshold>.02,'Не адаптируется к шуму');
+});
+const db='solfege-pitch-test-'+crypto.randomUUID();
+let frame=null;
+await test('Микрофон: ошибка, повтор, неверно → верно, удержание, остановка, настройки',async()=>{
+ const source=await(await fetch('../progress-store.js')).text(),html=await(await fetch('../play-the-note.html')).text();
+ const mock=`
+ Object.defineProperty(window,'localStorage',{value:{getItem(){return null},setItem(){}}});
+ window.Audio=class{play(){return Promise.resolve()}pause(){}};
+ Math.random=()=>0;
+ window.mock={midi:61,level:.2,now:0,ended:0,connected:false,callbacks:new Map(),next:0,deny:true};
+ window.requestAnimationFrame=fn=>{const id=++mock.next;mock.callbacks.set(id,fn);return id;};
+ window.cancelAnimationFrame=id=>mock.callbacks.delete(id);
+ mock.step=(advance=20)=>{mock.now+=advance;const list=[...mock.callbacks.values()];mock.callbacks.clear();list.forEach(fn=>fn(mock.now));};
+ Object.defineProperty(navigator,'mediaDevices',{value:{getUserMedia(options){
+  mock.options=options;if(mock.deny)return Promise.reject(Object.assign(Error(),{name:'NotAllowedError'}));
+  const track={onended:null,onmute:null,stop(){mock.ended++}};mock.track=track;
+  const stream={getTracks:()=>[track],getAudioTracks:()=>[track]};
+  return mock.defer?new Promise(resolve=>{mock.resolve=()=>resolve(stream)}):Promise.resolve(stream);
+ }}});
+ window.AudioContext=class{
+  constructor(){this.sampleRate=48000;this.state='running';this.destination={};}
+  resume(){mock.resumed=true;return Promise.resolve();}
+  decodeAudioData(){return Promise.resolve({});}
+  createBufferSource(){return {connect(){},disconnect(){},start(){},stop(){}};}
+  createGain(){return {gain:{value:0},connect(){},disconnect(){}};}
+  close(){this.state='closed';return Promise.resolve();}
+  createMediaStreamSource(){return {connect(target){if(!target.getFloatTimeDomainData)throw Error('Подключение к динамику');mock.connected=true;},disconnect(){}};}
+  createAnalyser(){return {set fftSize(value){mock.fftSize=value},get fftSize(){return mock.fftSize},disconnect(){},getFloatTimeDomainData(out){
+   const f=440*2**((mock.midi-69)/12);for(let i=0;i<out.length;i++)out[i]=mock.level*Math.sin(2*Math.PI*f*i/48000);
+  }};}
+ };
+ `;
+ const isolated=source.replace("DB_NAME = 'solfege-ear-trainers-progress'","DB_NAME = "+JSON.stringify(db));
+ frame=document.createElement('iframe');frame.style.cssText='width:365px;height:681px';
+ const ready=new Promise(r=>frame.onload=r);
+ frame.srcdoc=html.replace('<head>','<head><base href="'+new URL('../',location.href).href+'">').replace('<script src="./progress-store.js"><'+'/script>','<script>'+isolated+'<'+'/script><script>'+mock+'<'+'/script>');
+ document.body.append(frame);await ready;
+ const w=frame.contentWindow,d=frame.contentDocument,m=w.mock,$=id=>d.getElementById(id);
+ const until=async fn=>{const limit=performance.now()+5000;while(!await fn()){if(performance.now()>limit)throw Error('Ожидание');await new Promise(r=>setTimeout(r,20));}};
+ const count=async()=>(await w.SolfegeProgress.store.list()).length;
+ $('start').click();await until(()=>$('error').textContent.includes('запрещён'));
+ assert(!$('start').disabled,'Нет повтора');
+ m.deny=false;$('start').click();await until(()=>m.connected);
+ assert(m.options.audio.echoCancellation===false&&m.options.audio.channelCount===1&&m.resumed,'Параметры микрофона');
+ assert(m.fftSize===4096,'Обычный буфер');
+ for(let i=0;i<3;i++)m.step();
+ await until(async()=>await count()===1);
+ assert((await w.SolfegeProgress.store.list())[0].correct===false,'Неверная нота');
+ for(let i=0;i<80;i++)m.step();assert(await count()===1,'Удержание повторилось');
+ await until(()=>$('card').classList.contains('bad')===false);
+ m.level=0;m.step(100);m.step(100);m.level=.2;m.midi=60;
+ for(let i=0;i<4;i++)m.step();
+ assert($('hint').textContent==='Верно!','Правильная повторная попытка');
+ assert(await count()===1&&$('answers').textContent==='1'&&$('accuracy').textContent==='0%','Повторная попытка попала в статистику');
+ await until(()=>$('hint').textContent!=='Верно!');
+ // The next deterministic natural card is D4 (MIDI 62).
+ m.midi=62;for(let i=0;i<60;i++)m.step();assert(await count()===1,'Удержание ответило на новую карточку');
+ m.level=0;m.step(100);m.step(100);m.level=.2;for(let i=0;i<4;i++)m.step();
+ await until(async()=>await count()===2);
+ assert((await w.SolfegeProgress.store.list())[1].correct,'Новая карточка');
+ $('stop').click();assert(m.ended===1&&m.callbacks.size===0,'Стоп не освободил микрофон');
+ $('start').click();await until(()=>m.callbacks.size>0);
+ m.track.onended();assert($('error').textContent.includes('прерван')&&m.callbacks.size===0,'Прерывание');
+ $('range').value='extended';$('range').dispatchEvent(new w.Event('change'));
+ $('start').click();await until(()=>m.callbacks.size>0);assert(m.ended===2&&m.fftSize===8192,'Повторная инициализация, расширенный буфер');
+ Object.defineProperty(d,'hidden',{value:true,configurable:true});d.dispatchEvent(new w.Event('visibilitychange'));
+ assert(m.ended===3&&m.callbacks.size===0&&!$('start').disabled,'Скрытие документа');
+ $('reset').click();assert(await count()===2,'Сброс удалил историю');
+ for(const clef of ['treble','bass','both'])for(const range of ['beginner','extended'])for(const random of [0,.999]){
+  w.Math.random=()=>random;
+  for(const [id,value]of [['clef',clef],['range',range]]){$(id).value=value;$(id).dispatchEvent(new w.Event('change'));}
+  const drawing=$('drawing'),ledger=drawing.querySelectorAll('path')[1].getAttribute('d');
+  assert((ledger.match(/M/g)||[]).length<=2,'Чрезмерные добавочные линейки: '+clef+' '+range);
+  const svg=$('staff').getBoundingClientRect(),head=drawing.querySelector('ellipse').getBoundingClientRect();
+  assert(head.top>=svg.top&&head.bottom<=svg.bottom,'Нота обрезана');
+  assert(drawing.querySelectorAll('text').length===(clef==='both'?3:2),'Нет второго ключа');
+ }
+ Object.defineProperty(d,'hidden',{value:false,configurable:true});
+ m.defer=true;const ended=m.ended;$('start').click();$('stop').click();m.resolve();
+ await until(()=>m.ended===ended+1);
+ assert(!m.callbacks.size&&!$('start').disabled,'Запоздалое разрешение включило микрофон после Стоп');
+});
+if(frame){frame.contentDocument.getElementById('stop').click();await frame.contentWindow.SolfegeProgress.store.close();frame.remove();}
+await new Promise(resolve=>{const r=indexedDB.deleteDatabase(db);r.onsuccess=r.onerror=resolve;});
+window.__pitchTestResults=results;
+document.getElementById('results').textContent=results.filter(r=>r.name!=='Время детектора').map(r=>(r.ok?'OK ':'ОШИБКА ')+r.name+(r.error?': '+r.error:'')).join('\n');
+})();
+</script></body></html>

@@ -1,6 +1,11 @@
 {
   "project": "Тренажёры музыкального слуха",
   "exercise_sources": {
+    "play-the-note.html": {
+      "original": "new microphone exercise based on note-reading.html",
+      "sha256_original": null,
+      "sha256_packaged": "3ef25f763355287358b2170888b5542ea823420754fa09affaaba50df33d9e02"
+    },
     "intervals.html": {
       "original": "solfege_intervals_v3.html",
       "sha256_original": "26b668f348ce22a124dc5fb7ef9f03af1a1f06632c1265d16205f6a1acf2a150",

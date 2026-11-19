@@ -6,7 +6,9 @@
   const isolatedSource = source.replace("DB_NAME = 'solfege-ear-trainers-progress'", 'DB_NAME = ' + JSON.stringify(name));
   const assert = (ok, message) => { if (!ok) throw new Error(message); };
   const wait = async fn => { const start = performance.now(); while (!(await fn())) { if (performance.now() - start > 15000) throw new Error('Истекло время ожидания'); await new Promise(resolve => setTimeout(resolve, 30)); } };
-  const files = Object.keys(P.EXERCISES);
+  // Microphone lifecycle and one-verdict-per-card integration use safe mocks
+  // in pitch-tests.html, not this replay-button harness.
+  const files = Object.keys(P.EXERCISES).filter(id => id !== 'play-the-note');
   await Promise.all(files.map(async exercise => {
     const frame = document.createElement('iframe'); frame.style.cssText = 'width:432px;height:934px;border:0';
     let doc;
