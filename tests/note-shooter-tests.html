@@ -167,7 +167,12 @@ try{
   await until(async()=>(await w.SolfegeProgress.store.list()).length===1);
   assert($('answers').textContent==='1'&&$('streak').textContent==='1'&&$('accuracy').textContent==='100%','Попадание');
   assert(d.querySelectorAll('.note.moving').length===1&&!$('notes').querySelector('circle'),'Нет следующей ноты или осталась обводка');
-  assert($('effects').querySelector('.beam-fx')&&$('effects').querySelector('.score-fx').textContent==='+1','Нет визуального выстрела или очка');
+  assert($('effects').querySelector('.beam-fx')&&$('effects').querySelector('.note-fx.correct')?.textContent==='до','Нет визуального выстрела или зелёного названия');
+  const up=()=>$('effects').querySelector('.note-fx.correct');
+  if(!w.matchMedia('(prefers-reduced-motion: reduce)').matches){
+   const y0=+up().getAttribute('y');m.step(120);
+   assert(+up()?.getAttribute('y')<y0,'Зелёная надпись не летит вверх');
+  }
   assert(w.getComputedStyle(d.querySelector('.staff-lines')).stroke==='rgb(0, 0, 0)'&&w.getComputedStyle(d.querySelector('.staff-key')).fill==='rgb(0, 0, 0)'&&w.getComputedStyle(d.querySelector('.note ellipse')).fill==='rgb(0, 0, 0)'&&w.getComputedStyle($('stage')).backgroundColor==='rgb(255, 255, 255)','Нет чёрной нотации на белом фоне');
   for(let i=0;i<60;i++)m.step();
   assert((await w.SolfegeProgress.store.list()).length===1,'Удержание стало новым ответом');
@@ -180,18 +185,18 @@ try{
   assert(d.querySelector('.note.moving')&&!$('notes').querySelector('circle'),'Нет следующей ноты или осталась обводка');
   assert($('hearts').getAttribute('aria-label')==='Жизни: 3','Жизнь потеряна до столкновения');
   const label=()=>$('effects').querySelector('[data-outcome="wrong"]');
-  assert(label()?.textContent==='ре · 1-я октава'&&$('hint').textContent.includes(label().textContent),'Не показана правильная нота');
+  assert(label()?.textContent==='ре'&&$('hint').textContent.includes('Правильно: ре · 1-я октава'),'Не показана правильная нота без октавы');
   const initialY=+label().getAttribute('y'),bounds=label().getBBox();
   assert(bounds.x>=0&&bounds.x+bounds.width<=$('stage').clientWidth,'Подпись обрезана у правого края');
   m.step(300);assert($('hearts').getAttribute('aria-label')==='Жизни: 3','Слишком ранний удар');
-  if(!w.matchMedia('(prefers-reduced-motion: reduce)').matches)assert(+label().getAttribute('y')<initialY,'Подпись не поднимается');
+  if(!w.matchMedia('(prefers-reduced-motion: reduce)').matches)assert(+label().getAttribute('y')>initialY,'Красная надпись не летит вниз');
   m.step(300);assert($('hearts').getAttribute('aria-label')==='Жизни: 2'&&$('stage').classList.contains('shake'),'Нет взрыва и потери жизни');
   assert($('effects').querySelector('.burst-fx .pixel-particle'),'Нет пиксельного взрыва');
   assert($('accuracy').textContent==='50%'&&$('streak').textContent==='0','Точность и серия');
  });
  await test('Интерфейс: тайм-ауты, итоги, один ответ на ноту и рекорд',async()=>{
   m.level=0;m.step(9020-m.now);
-  assert($('effects').querySelector('[data-outcome="timeout"]')?.textContent==='до · 1-я октава','Нет правильной ноты после пропуска');
+  assert($('effects').querySelector('[data-outcome="timeout"]')?.textContent==='до','Нет правильной ноты после пропуска');
   m.step(20000);await until(()=>$('screenTitle').textContent==='Игра окончена');
   const rows=await w.SolfegeProgress.store.list();
   assert(rows.length===4&&rows.filter(r=>r.task.endsWith(':timeout')).length===2,'Нет отдельных тайм-аутов');

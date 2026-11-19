@@ -13,7 +13,7 @@ header{display:flex;align-items:center;justify-content:space-between;gap:12px;fl
 .arena{display:flex;flex-direction:column;flex:1;min-height:0;background:#fff;border:2px solid var(--edge);box-shadow:3px 3px 0 #dce3ed;overflow:hidden}
 .hud{display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:14px;padding:12px 16px;border-bottom:3px double var(--edge);background:linear-gradient(#fff,var(--metal));flex:none}.hearts{display:flex;gap:5px;color:var(--red)}.hearts svg{width:21px;height:19px;fill:currentColor}.lost{color:#b9c2d0}.tuner{justify-self:end;width:min(100%,230px);min-width:0}#heard{display:block;font:650 13px/1.4 var(--mono);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.meter{height:8px;background:#d4dbe7;border:1px solid #a1aec2;overflow:hidden;margin-top:5px}.meter span{display:block;height:100%;width:0;background:repeating-linear-gradient(90deg,#2447ae 0 6px,#4467c9 6px 8px)}
 button,select{font:inherit;min-height:44px;border:1px solid var(--edge);border-radius:2px;padding:8px 12px;background:#fff;color:var(--ink)}button{font-weight:700;cursor:pointer;touch-action:manipulation;box-shadow:inset 0 -3px #d5deec}button.primary{background:#263f9d;color:#fff;box-shadow:inset 0 2px #8299f0,inset 0 -3px #15265c}button:disabled{opacity:.5;cursor:default}button:focus-visible,a:focus-visible,select:focus-visible{outline:2px solid var(--blue);outline-offset:3px}
-.stage{position:relative;flex:1;min-height:0;background:#fff;isolation:isolate}#staff{display:block;width:100%;height:100%;overflow:hidden;position:absolute;inset:0}.staff-lines{stroke:#000;stroke-width:1.2}.answer-line{stroke:#4963a1;stroke-dasharray:5 7;stroke-width:1.5}.line-label{font:700 10px var(--mono);fill:var(--blue)}.staff-key{font-family:Bravura,"Noto Music","Apple Symbols",serif;fill:#000}.note{color:#000}.pixel-sprite,.pixel-particle{shape-rendering:crispEdges}.answer-label,.score-fx{font:800 17px var(--mono);paint-order:stroke fill;stroke:#fff;stroke-width:5;stroke-linejoin:round}.answer-label{fill:#8f1632}
+.stage{position:relative;flex:1;min-height:0;background:#fff;isolation:isolate}#staff{display:block;width:100%;height:100%;overflow:hidden;position:absolute;inset:0}.staff-lines{stroke:#000;stroke-width:1.2}.answer-line{stroke:#4963a1;stroke-dasharray:5 7;stroke-width:1.5}.line-label{font:700 10px var(--mono);fill:var(--blue)}.staff-key{font-family:Bravura,"Noto Music","Apple Symbols",serif;fill:#000}.note{color:#000}.pixel-sprite,.pixel-particle{shape-rendering:crispEdges}.note-fx{font:800 21px var(--mono);paint-order:stroke fill;stroke:#fff;stroke-width:6;stroke-linejoin:round}.note-fx.correct{fill:#15763c}.note-fx.wrong,.note-fx.timeout{fill:#a3162f}
 #ship .flame{display:none}#ship[data-thrust="0"] .flame-a,#ship[data-thrust="1"] .flame-b,#ship[data-thrust="2"] .flame-c{display:inline}#ship .canopy-glint{opacity:.25}#ship[data-thrust="2"] .canopy-glint{opacity:.8}
 .screen{position:absolute;z-index:2;inset:0;display:grid;place-items:center;padding:12px;background:#ffffffe0}.screen[hidden]{display:none}.panel{width:min(100%,430px);max-height:100%;overflow:auto;overscroll-behavior:contain;background:#fff;border:2px solid var(--edge);border-top:6px solid var(--blue);padding:20px;box-shadow:4px 4px #d5deec}.panel h2{font:800 24px/1.2 var(--mono);letter-spacing:-.05em;margin:0 0 8px}.panel p{margin:8px 0;color:var(--muted)}.settings{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:16px 0}.settings label{display:flex;flex-direction:column;gap:5px;font-size:13px}.settings select{width:100%;min-width:0}.settings .wide{grid-column:1/-1}.actions{display:flex;gap:8px;margin-top:16px}.actions button{flex:1}.range-hint{font-size:12px;min-height:34px}.error{color:var(--red)!important}.error:empty{display:none}.result{font-size:17px!important;color:var(--ink)!important}.small{font-size:12px}
 .metrics{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:5px;text-align:center;flex:none}.metric{padding:3px 0 5px;background:var(--metal);border-bottom:2px solid #a4b3cc}.metric b{display:block;font:800 24px/1.25 var(--mono);color:#192b63}.metric span{font-size:10px;color:var(--muted)}.bottom{display:flex;justify-content:space-between;gap:12px;align-items:center;font-size:12px;color:var(--muted);flex:none}.bottom p{margin:0;max-width:75%}
@@ -80,6 +80,7 @@ function answerName(midi) {
  const octave=Math.floor(midi/12)-1;
  return syllables[natural.indexOf(midi%12)]+' · '+['большая','малая','1-я','2-я','3-я'][octave-2]+' октава';
 }
+const pitchName=midi=>{const pc=((midi%12)+12)%12,index=natural.indexOf(pc);return index>=0?syllables[index]:syllables[natural.filter(n=>n<pc).pop()]+'♯';};
 function diatonic(midi) { return (Math.floor(midi/12)-1)*7+natural.indexOf(midi%12); }
 function noteSteps(midi,clef) { return diatonic(midi)-(clef==='treble'?4*7+2:2*7+4); }
 function createGame(settings, {random=Math.random,onVerdict=()=>{},onCollision=()=>{},best=0}={}) {
@@ -314,7 +315,7 @@ function layout(){
  $('background').innerHTML=`<path class="staff-lines" d="${lines}"/><path class="answer-line" d="M${width*CONFIG.lineX} ${Math.max(16,top-90)}V${Math.min(height-32,bottom+90)}"/><text class="line-label" x="${width*CONFIG.lineX+7}" y="${Math.min(height-12,bottom+108)}">ЛИНИЯ ОТВЕТА</text><text class="staff-key" x="10" y="${bottom-(clef==='treble'?.6:1.1)*gap}" font-size="${gap*4.2}">${clef==='treble'?'𝄞':'𝄢'}</text><g transform="translate(${Math.round(width*CONFIG.shipX)} ${Math.round(shipY)})">${shipSprite}</g>`;
 }
 function noteY(midi){return geometry.bottom-noteSteps(midi,game?.settings.clef||readSettings().clef)*geometry.gap/2;}
-const effectDuration={correct:.65,wrong:1.45,timeout:1.45,crash:.65};
+const effectDuration={correct:1.05,wrong:1.25,timeout:1.25,crash:.65};
 const spark='M-2-6H2V-2H6V2H2V6H-2V2H-6V-2H-2Z';
 function renderEffects(){
  const {width,shipY}=geometry,now=game?.time||0,effects=document.createDocumentFragment(), still=reducedMotion.matches;
@@ -342,12 +343,12 @@ function renderEffects(){
     const px=Math.round((x+Math.cos(angle)*radius)/2)*2,py=Math.round((y+Math.sin(angle)*radius)/2)*2;
     burst.append(svg('path',{class:'pixel-particle',d:i%3===0?spark:'M-2-2H2V2H-2Z',fill:colors[i%colors.length],transform:`translate(${px} ${py})`}));
    }
-   const score=svg('text',{class:'score-fx',x:Math.min(width-40,x+14),y:y-20-(still?0:age*25),fill:isHit?'#114d83':'#8f1632'});
-   score.textContent=isHit?'+1':'−1';burst.append(score);effects.append(burst);
-  }else{
-   const label=answerName(effect.midi),font=width<440?14:17,half=label.length*font*.32+7;
-   const text=svg('text',{class:'answer-label','data-outcome':effect.type,x:Math.max(half,Math.min(width-half,x)),y:Math.max(20,y-18-(still?0:Math.min(1,age/1.1)*34)),'text-anchor':'middle',style:`font-size:${font}px`,opacity:Math.min(1,(effectDuration[effect.type]-age)/.3)});
-   text.textContent=label;effects.append(text);
+   effects.append(burst);
+  }
+  if(!isCrash){
+   const name=pitchName(effect.midi),font=width<440?17:21,half=name.length*font*.34+8,rise=isHit?-(26+age*52):24+age*46;
+   const text=svg('text',{class:'note-fx '+effect.type,'data-outcome':effect.type,x:Math.max(half,Math.min(width-half,x)),y:Math.max(22,Math.min(geometry.height-14,y+(still?0:rise))),'text-anchor':'middle',style:`font-size:${font}px`,opacity:Math.min(1,(effectDuration[effect.type]-age)/.3)});
+   text.textContent=name;effects.append(text);
   }
  }
  $('effects').replaceChildren(effects);
