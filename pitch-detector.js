@@ -12,17 +12,20 @@
     for (const x of buffer) sum += x * x;
     return Math.sqrt(sum / buffer.length);
   }
-  function detector() {
+  const pianoWindowSize = (buffer, sampleRate) => Math.min(buffer.length, Math.round(sampleRate * .044));
+  function detector({ pianoAttack = false } = {}) {
     let signal = new Float64Array(0), nsdf = new Float64Array(0);
     return (buffer, sampleRate) => {
-      // Box-filter decimation reduces work on mobile; retain > 8 samples at C6.
-      const step = Math.max(1, Math.floor(sampleRate / 12000));
-      const size = Math.floor(buffer.length / step), rate = sampleRate / step;
+      // The arcade uses a recent window so a fast-decaying treble attack is
+      // not averaged with a previous note still in the analyser's buffer.
+      const step = Math.max(1, pianoAttack ? Math.round(sampleRate / 24000) : Math.floor(sampleRate / 12000));
+      const length = pianoAttack ? pianoWindowSize(buffer, sampleRate) : buffer.length;
+      const size = Math.floor(length / step), start = pianoAttack ? buffer.length - size * step : 0, rate = sampleRate / step;
       if (signal.length !== size) { signal = new Float64Array(size); nsdf = new Float64Array(size); }
       let mean = 0;
       for (let i = 0; i < size; i++) {
         let sum = 0;
-        for (let j = 0; j < step; j++) sum += buffer[i * step + j];
+        for (let j = 0; j < step; j++) sum += buffer[start + i * step + j];
         signal[i] = sum / step; mean += signal[i];
       }
       mean /= size;
@@ -37,32 +40,39 @@
         }
         nsdf[lag] = energy > 1e-15 ? 2 * product / energy : 0;
       }
+      function interpolate(lag) {
+        const a = nsdf[lag - 1], b = nsdf[lag], c = nsdf[lag + 1], denominator = a - 2 * b + c;
+        const offset = denominator ? .5 * (a - c) / denominator : 0;
+        return { frequency: rate / (lag + offset), clarity: Math.min(1, b - .25 * (a - c) * offset) };
+      }
       const peaks = [];
       let crossed = false, maximum = 0;
       for (let lag = 1; lag < maxLag; lag++) {
         if (nsdf[lag] < 0) crossed = true;
         if (crossed && lag >= minLag && nsdf[lag] > nsdf[lag - 1] && nsdf[lag] >= nsdf[lag + 1]) {
-          peaks.push(lag); maximum = Math.max(maximum, nsdf[lag]);
+          // Otherwise the first (short) period can lose to a multiple that
+          // happens to align better to the sample grid.
+          const peak = pianoAttack ? interpolate(lag) : null, score = peak ? peak.clarity : nsdf[lag];
+          peaks.push({ lag, peak, score }); maximum = Math.max(maximum, score);
         }
       }
-      const lag = peaks.find(i => nsdf[i] >= Math.max(.5, maximum * .93));
-      if (lag === undefined) return { frequency: 0, clarity: 0 };
-      const a = nsdf[lag - 1], b = nsdf[lag], c = nsdf[lag + 1];
-      const denominator = a - 2 * b + c;
-      const offset = denominator ? .5 * (a - c) / denominator : 0;
-      return { frequency: rate / (lag + offset), clarity: Math.min(1, b - .25 * (a - c) * offset) };
+      const chosen = peaks.find(p => p.score >= Math.max(.5, maximum * .93));
+      return chosen ? chosen.peak || interpolate(chosen.lag) : { frequency: 0, clarity: 0 };
     };
   }
-  function stability() {
-    let midi = null, center = 0, count = 0;
-    const reset = () => { midi = null; count = 0; };
+  function stability({ minClarity = .90, maxDrift = 20, allowedGaps = 0 } = {}) {
+    let midi = null, center = 0, count = 0, gaps = 0;
+    const reset = () => { midi = null; count = 0; gaps = 0; };
     return {
       reset,
       update(pitch, level, threshold, a4 = 440) {
         const n = note(pitch.frequency, a4);
-        if (!n || pitch.clarity < .90 || level <= threshold) { reset(); return null; }
-        if (n.midi !== midi || Math.abs(n.cents - center) > 20) {
-          midi = n.midi; center = n.cents; count = 1;
+        if (!n || pitch.clarity < minClarity || level <= threshold) {
+          if (++gaps > allowedGaps) reset();
+          return null;
+        }
+        if (n.midi !== midi || Math.abs(n.cents - center) > maxDrift) {
+          midi = n.midi; center = n.cents; count = 1; gaps = 0;
         } else count++;
         return count >= 3 ? n : null;
       }
@@ -102,5 +112,5 @@
       }
     };
   }
-  window.PitchDetector = Object.freeze({ frequency, note, rms, detector, stability, onset, noiseFloor });
+  window.PitchDetector = Object.freeze({ frequency, note, rms, pianoWindowSize, detector, stability, onset, noiseFloor });
 })();

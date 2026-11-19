@@ -56,18 +56,18 @@ button,select{font:inherit;min-height:44px;border:1px solid var(--edge);border-r
 </div>
 <div class="bottom"><p id="hint" role="status">Играйте ближайшую ноту справа от линии. Нужна та же октава.</p><a href="./progress.html">Мой прогресс</a></div>
 </main>
-<script src="./pitch-detector.js"></script><script src="./progress-store.js"></script>
+<script src="./pitch-detector.js?v=piano-attack"></script><script src="./progress-store.js"></script>
 <script>
 (() => {
 'use strict';
 // MIDI limits, geometry and beat timing live in this one immutable config.
 const CONFIG = Object.freeze({
  ranges: Object.freeze({
-  treble: Object.freeze({basic:Object.freeze([60,71]),extended:Object.freeze([57,84])}),
+  treble: Object.freeze({basic:Object.freeze([60,71]),extended:Object.freeze([59,83])}),
   bass: Object.freeze({basic:Object.freeze([43,57]),extended:Object.freeze([40,60])})
  }),
  shipX:.12, lineX:.38, spawnX:.95, travelBeats:8, spawnBeats:2,
- doomSeconds:.6, cooldownMs:700, lives:3, minBpm:60, maxBpm:160, bpmStep:10
+ doomSeconds:.6, cooldownMs:65, lives:3, minBpm:60, maxBpm:160, bpmStep:10
 });
 const natural=[0,2,4,5,7,9,11], syllables=['до','ре','ми','фа','соль','ля','си'];
 const noteName = midi => {
@@ -164,7 +164,9 @@ for(const id of ['clef','range','bpm'])$(id).addEventListener('change',()=>{
  rangeHint();if(!game){layout();render();}
 });
 let game=null,view='start',frame=0,lastFrame=null,generation=0,context=null,stream=null,source=null,analyser=null;
-let buffer,detect,stable=P.stability(),attack=P.onset(),noise=P.noiseFloor(),muteUntil=0,lastLevel=0;
+const pitchProfile=Object.freeze({minClarity:.88,maxDrift:26,allowedGaps:1});
+let buffer,recent,detect,stable=P.stability(pitchProfile),attack=P.onset(),noise=P.noiseFloor(),muteUntil=0,lastLevel=0;
+let confirmed=null,confirmedUntil=0;
 let fx=[],noteNodes=new Map(),geometry={width:1,height:1};
 const svgNS='http://www.w3.org/2000/svg';
 const reducedMotion=matchMedia('(prefers-reduced-motion: reduce)');
@@ -206,7 +208,7 @@ function onVerdict(event){
  saveBest();stats();blockMic();
  fx.push({id:note.id,at:event.at,type:outcome,x:note.x,midi:note.midi});
  const correctName=outcome==='correct'?'':answerName(note.midi);
- $('hint').textContent=outcome==='correct'?'Попадание! +1':outcome==='timeout'?'Пропуск. Правильно: '+correctName+'.':'Вы сыграли: '+noteName(actual)+'. Правильно: '+correctName+'.';
+ $('hint').textContent=outcome==='correct'?'Попадание! +1 · '+answerName(note.midi):outcome==='timeout'?'Пропуск. Правильно: '+correctName+'.':'Вы сыграли: '+noteName(actual)+'. Правильно: '+correctName+'.';
 }
 function onCollision(event){
  fx.push({id:event.note.id,at:event.at,type:'crash',x:CONFIG.shipX});
@@ -229,6 +231,7 @@ function releaseAudio(){
  if(stream){for(const t of stream.getTracks()){t.onended=null;t.onmute=null;t.stop();}stream=null;}
  if(source){source.disconnect();source=null;}if(analyser){analyser.disconnect();analyser=null;}
  if(context){const old=context;context=null;old.onstatechange=null;old.close().catch(()=>{});}
+ confirmed=null;confirmedUntil=0;
  $('heard').textContent='Слышу: —';$('level').style.width='0';$('meter').setAttribute('aria-valuenow','0');
 }
 function pauseGame(message=''){
@@ -240,7 +243,8 @@ function endGame(){
 }
 function newGame(){
  progress.reset();fx=[];noteNodes.clear();$('notes').replaceChildren();$('stage').classList.remove('shake');
- stable=P.stability();attack=P.onset();noise=P.noiseFloor();muteUntil=0;lastLevel=0;
+ stable.reset();attack=P.onset();noise=P.noiseFloor();muteUntil=0;lastLevel=0;
+ confirmed=null;confirmedUntil=0;
  game=createGame(readSettings(),{best:allTimeBest,onVerdict,onCollision});game.pause();stats();layout();render();
 }
 async function start(){
@@ -259,7 +263,8 @@ async function start(){
   stream=acquired;await resumed;if(token!==generation)return;
   if(document.hidden){pauseGame();return;}
   analyser=active.createAnalyser();analyser.fftSize=game.settings.range==='extended'?8192:4096;analyser.smoothingTimeConstant=0;
-  buffer=new Float32Array(analyser.fftSize);detect=P.detector();source=active.createMediaStreamSource(stream);source.connect(analyser);
+  buffer=new Float32Array(analyser.fftSize);recent=buffer.subarray(buffer.length-P.pianoWindowSize(buffer,active.sampleRate));
+  detect=P.detector({pianoAttack:true});source=active.createMediaStreamSource(stream);source.connect(analyser);
   for(const track of stream.getAudioTracks())track.onended=track.onmute=()=>pauseGame('Микрофон отключён или прерван. Проверьте доступ и нажмите «Продолжить».');
   active.onstatechange=()=>{if(view==='playing'&&active.state!=='running')pauseGame('Звук прерван системой. Нажмите «Продолжить».');};
   stable.reset();
@@ -271,15 +276,18 @@ async function start(){
  }
 }
 function hear(){
- analyser.getFloatTimeDomainData(buffer);lastLevel=P.rms(buffer);
+ analyser.getFloatTimeDomainData(buffer);lastLevel=P.rms(recent);
  const percent=Math.min(100,Math.round(lastLevel*700));$('level').style.width=percent+'%';$('meter').setAttribute('aria-valuenow',percent);
  const now=game.time*1000;
- if(now<muteUntil){$('heard').textContent='Слышу: —';return;}
- const pitch=detect(buffer,context.sampleRate),threshold=noise.update(lastLevel,pitch.clarity),n=P.note(pitch.frequency);
- $('heard').textContent=n&&pitch.clarity>=.90&&lastLevel>threshold?'Слышу: '+noteName(n.midi):'Слышу: —';
- if(!attack.update(now,lastLevel,threshold/3)){stable.reset();return;}
+ const showWaiting=text=>{$('heard').textContent=confirmed!==null&&now<confirmedUntil?'Слышу: '+noteName(confirmed):text;};
+ if(now<muteUntil){showWaiting('Жду нового нажатия');return;}
+ const pitch=detect(buffer,context.sampleRate),threshold=noise.update(lastLevel,pitch.clarity);
+ if(!attack.update(now,lastLevel,threshold/3)){stable.reset();showWaiting('Жду нового нажатия');return;}
  const accepted=stable.update(pitch,lastLevel,threshold);
- if(accepted){game.answer(accepted.midi,accepted.cents);blockMic();}
+ if(!accepted){showWaiting(pitch.frequency&&pitch.clarity>=pitchProfile.minClarity&&lastLevel>threshold?'Уточняю ноту…':'Слышу: —');return;}
+ const verdict=game.answer(accepted.midi,accepted.cents);
+ if(!verdict){blockMic();showWaiting('Ждите следующую ноту');return;}
+ confirmed=accepted.midi;confirmedUntil=now+320;showWaiting('');
 }
 function loop(now){
  if(view!=='playing')return;

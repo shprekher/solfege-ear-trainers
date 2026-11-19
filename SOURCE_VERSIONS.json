@@ -4,7 +4,7 @@
     "note-shooter.html": {
       "original": "new arcade exercise based on play-the-note.html",
       "sha256_original": null,
-      "sha256_packaged": "6dad64e8aa20da6cad863db744f650803027938571a6b756e8a6727bdfbcc712"
+      "sha256_packaged": "1b3636f9dedb63ce0857bdfa8281eb06031d40dffc18ff67695c6ff8e6a912c4"
     },
     "play-the-note.html": {
       "original": "new microphone exercise based on note-reading.html",

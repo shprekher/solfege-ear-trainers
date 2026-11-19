@@ -7,6 +7,19 @@
 const results=[],assert=(ok,message)=>{if(!ok)throw Error(message);},near=(a,b,epsilon=1e-7)=>Math.abs(a-b)<epsilon;
 async function test(name,fn){try{await fn();results.push({name,ok:true});}catch(error){results.push({name,ok:false,error:error.message});}}
 const until=async fn=>{const limit=performance.now()+6000;while(!await fn()){if(performance.now()>limit)throw Error('Истекло время ожидания');await new Promise(r=>setTimeout(r,20));}};
+function pianoFrame(out,rate,midi,age,previous=.08){
+ const f=440*2**((midi-69)/12),partials=[.64,.85,.46,.36,.20].map((volume,i)=>[volume,2*Math.PI*f*(i+1)*Math.sqrt(1+.0002*(i+1)**2)]);
+ let seed=179;
+ for(let i=0;i<out.length;i++){
+  const t=(i-out.length)/rate+age;
+  seed=(1664525*seed+1013904223)>>>0;
+  let value=0;
+  if(t<0)value=previous*Math.sin(2*Math.PI*440*t);
+  else for(const [volume,angular]of partials)value+=.15*volume*Math.exp(-t/.04)*Math.sin(angular*t);
+  out[i]=value+(seed/2**32-.5)*.001;
+ }
+ return out;
+}
 const db='solfege-shooter-test-'+crypto.randomUUID();
 let frame;
 try{
@@ -32,6 +45,7 @@ try{
   close(){this.state='closed';return Promise.resolve();}
   createMediaStreamSource(){return {connect(target){if(!target.getFloatTimeDomainData)throw Error('Микрофон подключён к динамику');mock.connected++;},disconnect(){}};}
   createAnalyser(){return {set fftSize(n){mock.fftSize=n},get fftSize(){return mock.fftSize},disconnect(){},getFloatTimeDomainData(out){
+   if(mock.fill){mock.fill(out);return;}
    const f=440*2**((mock.midi-69)/12);for(let i=0;i<out.length;i++)out[i]=mock.level*Math.sin(2*Math.PI*f*i/48000);
   }};}
   createOscillator(){mock.outputAttempts++;throw Error('Игра создала звуковой эффект');}
@@ -44,8 +58,30 @@ try{
  document.body.append(frame);await ready;
  const w=frame.contentWindow,d=frame.contentDocument,m=w.mock,S=w.NoteShooter,C=S.CONFIG,$=id=>d.getElementById(id);
  const create=(options={},callbacks={})=>S.createGame({clef:'treble',range:'basic',bpm:80,...options},{random:()=>0,...callbacks});
+ await test('Короткие фортепианные ноты: соль и си второй октавы, крайние низы и до третьей',()=>{
+  const P=w.PitchDetector,detect=P.detector({pianoAttack:true});
+  for(const rate of [32000,44100,48000,96000])for(const midi of [40,43,60,79,83,84]){
+   const gate=P.stability({minClarity:.88,maxDrift:26,allowedGaps:1}),buffer=new Float32Array(8192);
+   let accepted=null;
+   for(let t=35;t<=110&&!accepted;t+=15){
+    pianoFrame(buffer,rate,midi,t/1000);
+    const pitch=detect(buffer,rate),recent=buffer.subarray(buffer.length-P.pianoWindowSize(buffer,rate));
+    accepted=gate.update(pitch,P.rms(recent),.003);
+   }
+   assert(accepted?.midi===midi&&Math.abs(accepted.cents)<12,'MIDI '+midi+' на '+rate+' Гц');
+  }
+ });
+ await test('Один неуверенный кадр не сбрасывает атаку, смена ноты сбрасывает',()=>{
+  const P=w.PitchDetector,gate=P.stability({minClarity:.88,maxDrift:26,allowedGaps:1});
+  const frame=(midi,clarity=1)=>gate.update({frequency:P.frequency(midi),clarity},.04,.003);
+  assert(!frame(79)&&!frame(79,.70)&&!frame(79)&&frame(79)?.midi===79,'Потеря одного кадра');
+  gate.reset();
+  assert(!frame(79)&&!frame(79)&&!frame(83)&&!frame(83)&&frame(83)?.midi===83,'Смешались соседние атаки');
+  gate.reset();
+  assert(!frame(79)&&!frame(79,.60)&&!frame(79,.60)&&!frame(79)&&!frame(79),'Склеились раздельные звуки');
+ });
  await test('Конфиг диапазонов, только натуральные, без повторов',()=>{
-  const expected={treble:{basic:[60,71],extended:[57,84]},bass:{basic:[43,57],extended:[40,60]}};
+  const expected={treble:{basic:[60,71],extended:[59,83]},bass:{basic:[43,57],extended:[40,60]}};
   assert(JSON.stringify(C.ranges)===JSON.stringify(expected),'Границы диапазонов');
   for(const clef of ['treble','bass'])for(const range of ['basic','extended']){
    const [low,high]=C.ranges[clef][range];let previous=null;
@@ -105,12 +141,13 @@ try{
   const a=create(),b=create();a.advance(10);for(let i=0;i<600;i++)b.advance(1/60);
   assert(a.phase===b.phase&&a.answers===b.answers&&a.lives===b.lives&&near(a.time,b.time,.017),'Частота кадров меняет результат');
  });
- await test('Нотная запись: не больше двух/одной добавочной линейки',()=>{
+ await test('Не больше одной добавочной линейки; скрипичный диапазон от си до си',()=>{
+  assert(S.noteSteps(59,'treble')===-3&&S.noteSteps(83,'treble')===11,'Си должна быть сразу за добавочной линейкой');
   for(const clef of ['treble','bass'])for(const range of ['basic','extended']){
    const [low,high]=C.ranges[clef][range];
    for(const midi of [low,high]){
     const steps=S.noteSteps(midi,clef),ledger=steps<0?Math.floor(-steps/2):steps>8?Math.floor((steps-8)/2):0;
-    assert(ledger<=(clef==='treble'?2:1),'Добавочные линейки');
+    assert(ledger<=1,'Добавочные линейки');
    }
   }
  });
@@ -205,6 +242,26 @@ try{
    assert(get('best').textContent==='1'&&get('clef').value==='bass'&&get('range').value==='extended'&&get('bpm').value==='160','Не восстановлены значения');
    assert(get('answers').textContent==='0'&&get('screenTitle').textContent==='Нотная аркада','Восстановлена незавершённая игра');
   }finally{await reopened.contentWindow.SolfegeProgress.store.close();reopened.remove();}
+ });
+ await test('Аркада засчитывает соль и си второй октавы подряд, без паузы в 700 мс',async()=>{
+  $('clef').value='treble';$('range').value='extended';$('bpm').value='80';
+  let draws=0;w.Math.random=()=>draws++===0?12.2/15:13.2/14;
+  m.defer=false;m.level=0;$('start').click();await until(()=>m.connected===5);
+  m.step(0);m.step(1600);
+  const first= m.now-20;
+  m.fill=out=>pianoFrame(out,48000,79,(m.now-first)/1000);
+  m.step(15);
+  assert(!$('heard').textContent.includes('соль')&&$('answers').textContent==='0','Один кадр показан как подтверждённый ответ');
+  for(let i=0;i<5&&$('answers').textContent==='0';i++)m.step(15);
+  assert($('hint').textContent.includes('соль · 2-я октава')&&$('accuracy').textContent==='100%','Соль не засчитана');
+  const previousHit=m.now;
+  m.fill=null;for(let i=0;i<10;i++)m.step(20);
+  const second=m.now;
+  m.fill=out=>pianoFrame(out,48000,83,(m.now-second)/1000,0);
+  for(let i=0;i<10&&$('answers').textContent==='1';i++)m.step(15);
+  assert($('answers').textContent==='2'&&$('hint').textContent.includes('си · 2-я октава')&&$('accuracy').textContent==='100%','Си не засчитана');
+  assert(m.now-previousHit<700,'Второй ответ всё ещё требует 700 мс');
+  m.fill=null;$('pause').click();
  });
 }catch(error){results.push({name:'Запуск стенда',ok:false,error:error.message});}
 finally{
