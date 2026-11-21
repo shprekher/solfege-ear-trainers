@@ -121,8 +121,9 @@ try{
   const victories=[];const g=create({}, {onVictory:value=>victories.push(value.bpm)});
   for(let i=0;i<49;i++){g.advance(1.5);g.answer(g.target().midi);}
   assert(victories.length===0,'Победа раньше 50');
-  g.advance(1.5);g.answer(g.target().midi);
+  g.lives=1;g.advance(1.5);g.answer(g.target().midi);
   assert(victories.length===1&&g.sinceVictory===0,'Нет победы на 50-й ноте');
+  assert(g.lives===g.maxLives,'Жизни не восстановились после победы');
   g.advance(1.5);g.answer(g.target().midi);
   assert(victories.length===1,'Победа повторилась сразу');
   g.setBpm(90);assert(g.bpm===90&&g.beat===60/90,'Темп не изменился');
@@ -191,6 +192,10 @@ try{
    assert(+up()?.getAttribute('y')<y0,'Зелёная надпись не летит вверх');
   }
   assert(w.getComputedStyle(d.querySelector('.staff-lines')).stroke==='rgb(0, 0, 0)'&&w.getComputedStyle(d.querySelector('.staff-key')).fill==='rgb(0, 0, 0)'&&w.getComputedStyle(d.querySelector('.note ellipse')).fill==='rgb(0, 0, 0)'&&w.getComputedStyle($('stage')).backgroundColor==='rgb(255, 255, 255)','Нет чёрной нотации на белом фоне');
+  const transformY=node=>+(node.getAttribute('transform').match(/translate\([^ ]+ ([\d.-]+)\)/)||[])[1];
+  const shipY=transformY($('ship')),aimY=transformY(d.querySelector('.note.moving'));
+  assert(Number.isFinite(shipY)&&Number.isFinite(aimY)&&Math.abs(shipY-aimY)<18,'Корабль не на высоте цели');
+  assert($('ship').getAttribute('transform').includes('rotate'),'Нет наклона корпуса');
   for(let i=0;i<60;i++)m.step();
   assert((await w.SolfegeProgress.store.list()).length===1,'Удержание стало новым ответом');
  });
