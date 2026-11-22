@@ -40,12 +40,12 @@ button,select{font:inherit;min-height:44px;border:1px solid var(--edge);border-r
   <p class="result" id="result" hidden></p>
   <div id="settingsBox">
    <div class="settings">
-    <label>Ключ<select id="clef"><option value="treble">Скрипичный</option><option value="bass">Басовый</option></select></label>
+    <label>Ключ<select id="clef"><option value="treble">Скрипичный</option><option value="bass">Басовый</option><option value="both">Оба ключа</option></select></label>
     <label>Диапазон<select id="range"><option value="basic">Базовый</option><option value="extended">Расширенный</option></select></label>
     <label class="wide">Темп, ударов в минуту<select id="bpm"><option>60</option><option>70</option><option selected>80</option><option>90</option><option>100</option><option>110</option><option>120</option><option>130</option><option>140</option><option>150</option><option>160</option></select></label>
    </div>
    <p class="range-hint" id="rangeHint"></p>
-    <p class="small">Играйте по одной ноте без педали. После ответа отпустите клавишу и дайте звуку затихнуть. Игра не издаёт звуков.</p>
+    <p class="small">Играйте по одной ноте без педали. В режиме «Оба ключа» ноты появляются на верхнем или нижнем стане. После ответа отпустите клавишу и дайте звуку затихнуть. Игра не издаёт звуков.</p>
   </div>
   <p class="error" id="error" role="alert"></p>
   <div class="actions"><button class="primary" id="start">Старт</button><button id="finish" hidden>Завершить</button></div>
@@ -86,6 +86,17 @@ function answerName(midi) {
 const pitchName=midi=>{const pc=((midi%12)+12)%12,index=natural.indexOf(pc);return index>=0?syllables[index]:syllables[natural.filter(n=>n<pc).pop()]+'♯';};
 function diatonic(midi) { return (Math.floor(midi/12)-1)*7+natural.indexOf(midi%12); }
 function noteSteps(midi,clef) { return diatonic(midi)-(clef==='treble'?4*7+2:2*7+4); }
+function notePool(settings) {
+ const keys=settings.clef==='both'?['treble','bass']:[settings.clef],pool=new Set();
+ for(const clef of keys){
+  const range=CONFIG.ranges[clef]?.[settings.range];if(!range)return [];
+  for(let n=range[0];n<=range[1];n++)if(natural.includes(n%12))pool.add(n);
+ }
+ return [...pool].sort((a,b)=>a-b);
+}
+// Middle C and higher belong to the upper staff. Deduplicate the overlapping
+// ranges so a pitch keeps its adaptive weight instead of getting two tickets.
+function staffFor(midi,clef) { return clef==='both'?(midi>=60?'treble':'bass'):clef; }
 // Weighted draw: a note above the pool's average error rate becomes more
 // likely, up to a cap. The previous note is always excluded.
 function weightedPick(pool, previous, rates, random = Math.random) {
@@ -105,16 +116,15 @@ function weightedPick(pool, previous, rates, random = Math.random) {
  return candidates[candidates.length - 1];
 }
 function createGame(settings, {random=Math.random,onVerdict=()=>{},onCollision=()=>{},onVictory=()=>{},best=0,rates={}}={}) {
- const range=CONFIG.ranges[settings.clef]?.[settings.range];
- if(!range||!Number.isInteger(settings.bpm)||settings.bpm<CONFIG.minBpm||settings.bpm>CONFIG.maxBpm||settings.bpm%CONFIG.bpmStep)throw Error('Неверные настройки игры');
- const pool=[];for(let n=range[0];n<=range[1];n++)if(natural.includes(n%12))pool.push(n);
+ const pool=notePool(settings);
+ if(!pool.length||!Number.isInteger(settings.bpm)||settings.bpm<CONFIG.minBpm||settings.bpm>CONFIG.maxBpm||settings.bpm%CONFIG.bpmStep)throw Error('Неверные настройки игры');
  const maxLives=CONFIG.lives[settings.range], cleanRates={};
  for(const [key,value] of Object.entries(rates))if(Number.isFinite(+value)&&+value>=0&&+value<=1)cleanRates[key]=+value;
  const game={settings:Object.freeze({...settings}),phase:'running',time:0,notes:[],lives:maxLives,maxLives,answers:0,correct:0,streak:0,best,rates:cleanRates,sinceVictory:0,victories:0,bpm:settings.bpm,beat:60/settings.bpm,spawnIn:CONFIG.spawnBeats*60/settings.bpm};
  let previous=null, serial=0;
  function spawn(){
   const midi=weightedPick(pool,previous,game.rates,random);previous=midi;
-  game.notes.push({id:++serial,midi,x:CONFIG.spawnX,speed:(CONFIG.spawnX-CONFIG.lineX)/(CONFIG.travelBeats*game.beat),state:'moving',age:0,doomAge:0});
+  game.notes.push({id:++serial,midi,clef:staffFor(midi,settings.clef),x:CONFIG.spawnX,speed:(CONFIG.spawnX-CONFIG.lineX)/(CONFIG.travelBeats*game.beat),state:'moving',age:0,doomAge:0});
  }
  game.target=()=>game.notes.filter(n=>n.state==='moving').reduce((left,n)=>!left||n.x<left.x?n:left,null);
  function resolve(note,outcome,actual=null){
@@ -176,7 +186,7 @@ function createGame(settings, {random=Math.random,onVerdict=()=>{},onCollision=(
  };
  spawn();return game;
 }
-window.NoteShooter=Object.freeze({CONFIG,createGame,noteName,noteSteps,weightedPick});
+window.NoteShooter=Object.freeze({CONFIG,createGame,noteName,noteSteps,weightedPick,notePool});
 
 const $=id=>document.getElementById(id), P=window.PitchDetector, progress=window.SolfegeProgress.tracker('note-shooter');
 const intro=$('screenText').textContent;
@@ -184,7 +194,7 @@ const settingsKey='solfege-note-shooter-settings',bestKey='solfege-note-shooter-
 let allTimeBest=0;
 try{
  const saved=JSON.parse(localStorage.getItem(settingsKey)||'{}');
- if(['treble','bass'].includes(saved.clef))$('clef').value=saved.clef;
+ if(['treble','bass','both'].includes(saved.clef))$('clef').value=saved.clef;
  if(['basic','extended'].includes(saved.range))$('range').value=saved.range;
  if(Number.isInteger(saved.bpm)&&saved.bpm>=60&&saved.bpm<=160&&saved.bpm%10===0)$('bpm').value=saved.bpm;
  const best=Number(localStorage.getItem(bestKey));if(Number.isSafeInteger(best)&&best>=0)allTimeBest=best;
@@ -200,8 +210,12 @@ function readRates(){
 }
 function saveRates(){try{localStorage.setItem(ratesKey,JSON.stringify(game.rates));}catch{}}
 function rangeHint(){
- const s=readSettings(),[low,high]=CONFIG.ranges[s.clef][s.range];
- $('rangeHint').textContent=`${noteName(low)} — ${noteName(high)}. До линии: ${(8*60/s.bpm).toFixed(1).replace('.',',')} с. Новая нота каждые ${(2*60/s.bpm).toFixed(2).replace('.',',')} с.`;
+ const s=readSettings(),pool=notePool(s),keys=s.clef==='both'?['treble','bass']:[s.clef];
+ const ranges=keys.map(clef=>{
+  const notes=pool.filter(n=>staffFor(n,s.clef)===clef);
+  return (s.clef==='both'?(clef==='treble'?'Скрипичный: ':'Басовый: '):'')+noteName(notes[0])+' — '+noteName(notes[notes.length-1]);
+ }).join(' · ');
+ $('rangeHint').textContent=`${ranges}. До линии: ${(8*60/s.bpm).toFixed(1).replace('.',',')} с. Новая нота каждые ${(2*60/s.bpm).toFixed(2).replace('.',',')} с.`;
 }
 for(const id of ['clef','range','bpm'])$(id).addEventListener('change',()=>{
  saveSettings();rangeHint();if(!game){layout();render();}
@@ -250,7 +264,7 @@ function onVerdict(event){
  const {note,outcome,actual}=event;
  progress.record({correct:outcome==='correct',task:note.midi+':'+outcome,mode:{clef:game.settings.clef,direction:(game.settings.range==='basic'?'Базовый':'Расширенный')+' · '+game.bpm+' уд/мин'},expected:noteName(note.midi),actual:outcome==='timeout'?'Пропуск (нота не сыграна)':noteName(actual)});
  saveBest();saveRates();stats();blockMic();
- fx.push({id:note.id,at:event.at,type:outcome,x:note.x,midi:note.midi});
+ fx.push({id:note.id,at:event.at,type:outcome,x:note.x,midi:note.midi,clef:note.clef});
  const correctName=outcome==='correct'?'':answerName(note.midi);
  $('hint').textContent=outcome==='correct'?'Попадание! +1 · '+answerName(note.midi):outcome==='timeout'?'Пропуск. Правильно: '+correctName+'.':'Вы сыграли: '+noteName(actual)+'. Правильно: '+correctName+'.';
 }
@@ -394,22 +408,31 @@ function loop(now){
 }
 function layout(){
  const width=$('stage').clientWidth,height=$('stage').clientHeight;
- const gap=Math.max(12,Math.min(18,width/38)),top=height*.40,bottom=top+gap*4,shipY=bottom+gap*2.8;
- geometry={width,height,gap,top,bottom,shipY};$('staff').setAttribute('viewBox',`0 0 ${width} ${height}`);
+ const clef=game?.settings.clef||readSettings().clef,grand=clef==='both';
+ const gap=Math.max(12,Math.min(18,width/38)),top=grand?Math.max(height*.40,height*.36+gap*2+8):height*.40;
+ const staves={},keys=grand?['treble','bass']:[clef];
+ keys.forEach((key,i)=>{const staffTop=top+i*gap*8.5;staves[key]={top:staffTop,bottom:staffTop+gap*4};});
+ const bottom=staves[keys[keys.length-1]].bottom,shipY=bottom+gap*2.8;
+ geometry={width,height,gap,staves,shipY};$('staff').setAttribute('viewBox',`0 0 ${width} ${height}`);
  if(shipCurrentY===null)shipCurrentY=shipY;
  const layer=$('shipLayer');if(!layer.querySelector('#ship'))layer.innerHTML=shipSprite;
- const clef=game?.settings.clef||readSettings().clef;
- let lines='';for(let i=0;i<5;i++)lines+=`M12 ${top+i*gap}H${width} `;
- $('background').innerHTML=`<path class="staff-lines" d="${lines}"/><path class="answer-line" d="M${width*CONFIG.lineX} ${Math.max(16,top-90)}V${Math.min(height-32,bottom+90)}"/><text class="line-label" x="${width*CONFIG.lineX+7}" y="${Math.min(height-12,bottom+108)}">ЛИНИЯ ОТВЕТА</text><text class="staff-key" x="10" y="${bottom-(clef==='treble'?.6:1.1)*gap}" font-size="${gap*4.2}">${clef==='treble'?'𝄞':'𝄢'}</text>`;
+ const systems=keys.map(key=>{
+  const staff=staves[key];let lines='';for(let i=0;i<5;i++)lines+=`M12 ${staff.top+i*gap}H${width} `;
+  return `<g data-clef="${key}"><path class="staff-lines" d="${lines}"/><text class="staff-key" x="10" y="${staff.bottom-(key==='treble'?.6:1.1)*gap}" font-size="${gap*4.2}">${key==='treble'?'𝄞':'𝄢'}</text></g>`;
+ }).join('');
+ const mid=(top+bottom)/2,brace=grand?`<path class="grand-brace" d="M8 ${top}C0 ${top+10} 12 ${mid-12} 3 ${mid}C12 ${mid+12} 0 ${bottom-10} 8 ${bottom}" fill="none" stroke="#000" stroke-width="1.6"/>`:'';
+ $('background').innerHTML=systems+brace+`<path class="answer-line" d="M${width*CONFIG.lineX} ${Math.max(16,top-90)}V${Math.min(height-32,bottom+90)}"/><text class="line-label" x="${width*CONFIG.lineX+7}" y="${Math.min(height-12,bottom+108)}">ЛИНИЯ ОТВЕТА</text>`;
 }
-function noteY(midi){return geometry.bottom-noteSteps(midi,game?.settings.clef||readSettings().clef)*geometry.gap/2;}
+function noteY(midi,clef=staffFor(midi,game?.settings.clef||readSettings().clef)){
+ return geometry.staves[clef].bottom-noteSteps(midi,clef)*geometry.gap/2;
+}
 const effectDuration={correct:1.05,wrong:1.25,timeout:1.25,crash:.65};
 const spark='M-2-6H2V-2H6V2H2V6H-2V2H-6V-2H-2Z';
 function renderEffects(){
  const {width}=geometry,now=game?.time||0,effects=document.createDocumentFragment(), still=reducedMotion.matches, shipY=shipCurrentY??geometry.shipY;
  fx=fx.filter(effect=>now-effect.at<effectDuration[effect.type]);
  for(const effect of fx){
-  const age=Math.max(0,now-effect.at),x=effect.x*width,isCrash=effect.type==='crash',isHit=effect.type==='correct',y=isCrash?(effect.y??shipY):noteY(effect.midi);
+  const age=Math.max(0,now-effect.at),x=effect.x*width,isCrash=effect.type==='crash',isHit=effect.type==='correct',y=isCrash?(effect.y??shipY):noteY(effect.midi,effect.clef);
   if(age<.16&&(isHit||effect.type==='wrong')){
    const endY=y+(isHit?0:-48),startX=width*CONFIG.shipX+23,beam=svg('g',{class:'beam-fx',opacity:1-age/.16});
    if(!still){
@@ -442,10 +465,10 @@ function renderEffects(){
  $('effects').replaceChildren(effects);
 }
 function render(dt=1/60){
- const {width,height,gap,bottom,top}=geometry;
+ const {width,height,gap}=geometry;
  if(width<=1||height<=1)return;
  const target=game?.target(),live=new Set(),ship=$('ship');
- const desired=target?noteY(target.midi):(shipCurrentY??geometry.shipY);
+ const desired=target?noteY(target.midi,target.clef):(shipCurrentY??geometry.shipY);
  if(shipCurrentY===null)shipCurrentY=desired;
  const dy=desired-shipCurrentY,k=1-Math.exp(-Math.max(0,dt)*8);
  shipCurrentY+=dy*k;
@@ -461,13 +484,14 @@ function render(dt=1/60){
   live.add(note.id);
   let node=noteNodes.get(note.id);
   if(!node){
-   node=svg('g');node.append(svg('path',{'data-ledger':'',fill:'none',stroke:'currentColor','stroke-width':1.3}),svg('path',{'data-stem':'',fill:'none',stroke:'currentColor','stroke-width':1.7}),svg('ellipse',{cx:0,cy:0,transform:'rotate(-18)',fill:'currentColor'}));
+   node=svg('g',{'data-clef':note.clef});node.append(svg('path',{'data-ledger':'',fill:'none',stroke:'currentColor','stroke-width':1.3}),svg('path',{'data-stem':'',fill:'none',stroke:'currentColor','stroke-width':1.7}),svg('ellipse',{cx:0,cy:0,transform:'rotate(-18)',fill:'currentColor'}));
    noteNodes.set(note.id,node);$('notes').append(node);
   }
-  let y=noteY(note.midi);
+  const {top,bottom}=geometry.staves[note.clef];
+  let y=noteY(note.midi,note.clef);
   if(note.state==='doomed')y+=(shipCurrentY-y)*Math.min(1,note.doomAge/CONFIG.doomSeconds);
   node.setAttribute('transform',`translate(${note.x*width} ${y})`);node.setAttribute('class','note '+note.state);
-  const originalY=noteY(note.midi),rx=Math.max(9,gap*.68),stem=Math.max(32,gap*2.7),ledgerWidth=Math.max(14,gap*.95);let ledger='';
+  const originalY=noteY(note.midi,note.clef),rx=Math.max(9,gap*.68),stem=Math.max(32,gap*2.7),ledgerWidth=Math.max(14,gap*.95);let ledger='';
   for(let yy=bottom+gap;yy<=originalY+.1;yy+=gap)ledger+=`M-${ledgerWidth} ${yy-originalY}H${ledgerWidth} `;
   for(let yy=top-gap;yy>=originalY-.1;yy-=gap)ledger+=`M-${ledgerWidth} ${yy-originalY}H${ledgerWidth} `;
   node.querySelector('[data-ledger]').setAttribute('d',note.state==='moving'?ledger:'');
@@ -476,7 +500,7 @@ function render(dt=1/60){
  }
  for(const [id,node]of noteNodes)if(!live.has(id)){node.remove();noteNodes.delete(id);}
  renderEffects();
- $('staff').setAttribute('aria-label',target?'Активная нота движется к линии ответа, '+(game.settings.clef==='treble'?'скрипичный':'басовый')+' ключ':'Ноты движутся справа к линии ответа');
+ $('staff').setAttribute('aria-label',target?'Активная нота движется к линии ответа, '+(target.clef==='treble'?'скрипичный':'басовый')+' ключ':'Ноты движутся справа к линии ответа');
 }
 $('start').onclick=start;$('pause').onclick=()=>pauseGame();$('finish').onclick=()=>{if(game)endGame();};
 document.addEventListener('visibilitychange',()=>{if(document.hidden)pauseGame();});

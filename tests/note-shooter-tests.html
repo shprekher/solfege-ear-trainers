@@ -80,7 +80,7 @@ try{
   gate.reset();
   assert(!frame(79)&&!frame(79,.60)&&!frame(79,.60)&&!frame(79)&&!frame(79),'Склеились раздельные звуки');
  });
- await test('Конфиг диапазонов, только натуральные, без повторов',()=>{
+  await test('Конфиг диапазонов, только натуральные, без повторов',()=>{
   const expected={treble:{basic:[60,71],extended:[59,83]},bass:{basic:[43,57],extended:[40,60]}};
   assert(JSON.stringify(C.lives)===JSON.stringify({basic:3,extended:5}),'Жизни по диапазону');
   assert(JSON.stringify(C.ranges)===JSON.stringify(expected),'Границы диапазонов');
@@ -92,8 +92,32 @@ try{
     assert([0,2,4,5,7,9,11].includes(n.midi%12)&&n.midi!==previous,'Знаки или повтор');previous=n.midi;
     g.answer(n.midi);g.advance(1.5);
    }
-  }
- });
+   }
+  });
+  await test('Оба ключа: общий адаптивный выбор, без повторов и удвоения нот',()=>{
+   for(const range of ['basic','extended']){
+    let seed=33;const random=()=>{seed=(1664525*seed+1013904223)>>>0;return seed/2**32;};
+    const g=create({clef:'both',range},{random,rates:{60:.4,71:.8}}),seen=new Set();
+    const pool=S.notePool(g.settings);
+    assert(new Set(pool).size===pool.length,'Общие ноты получили двойной вес');
+    let previous=null;
+    for(let i=0;i<75;i++){
+     const n=g.target(),[low,high]=C.ranges[n.clef][range];seen.add(n.clef);
+     assert(n.midi!==previous&&n.midi>=low&&n.midi<=high,'Повтор или неверный диапазон');
+     assert(n.clef===(n.midi>=60?'treble':'bass'),'Неверный стан');
+     previous=n.midi;const before=g.rates[n.midi]||0;
+     if(i===0){
+      g.answer(n.midi+1);
+      assert(near(g.rates[n.midi],Math.min(1,before+C.adaptive.errorBoost)),'Ошибка не усилила вес');
+     }else{
+      g.answer(n.midi);
+      assert(near(g.rates[n.midi],before*C.adaptive.decay),'Верный ответ не снижает вес');
+     }
+     g.advance(1.5);
+    }
+    assert(seen.size===2&&g.victories===1&&g.lives===g.maxLives,'Нет обоих ключей, победы или восстановления жизней');
+   }
+  });
  await test('80 ударов: появление каждые 1,5 с, путь до линии 6 с',()=>{
   const events=[],g=create({}, {onVerdict:e=>events.push(e)}),first=g.notes[0];
   g.advance(1.49);assert(g.notes.length===1,'Слишком раннее появление');
@@ -271,7 +295,7 @@ try{
    assert(get('answers').textContent==='0'&&get('screenTitle').textContent==='Нотная аркада','Восстановлена незавершённая игра');
   }finally{await reopened.contentWindow.SolfegeProgress.store.close();reopened.remove();}
  });
- await test('Аркада засчитывает соль второй октавы с растянутым строем и си подряд',async()=>{
+  await test('Аркада засчитывает соль второй октавы с растянутым строем и си подряд',async()=>{
   $('clef').value='treble';$('range').value='extended';$('bpm').value='80';
   let draws=0;m.values.delete('solfege-note-shooter-rates');w.Math.random=()=>draws++===0?12.2/15:13.2/14;
   m.defer=false;m.level=0;$('start').click();await until(()=>m.connected===5);
@@ -289,8 +313,51 @@ try{
   for(let i=0;i<10&&$('answers').textContent==='1';i++)m.step(15);
   assert($('answers').textContent==='2'&&$('hint').textContent.includes('си · 2-я октава')&&$('accuracy').textContent==='100%','Си не засчитана');
   assert(m.now-previousHit<700,'Второй ответ всё ещё требует 700 мс');
-  m.fill=null;$('pause').click();
- });
+   m.fill=null;$('pause').click();
+  });
+  await test('Фортепианная система: оба стана, корабль, ответы, сохранение и портретная вёрстка',async()=>{
+   $('finish').click();$('clef').value='both';$('range').value='extended';$('bpm').value='80';
+   for(const id of ['clef','range','bpm'])$(id).dispatchEvent(new w.Event('change'));
+   let draws=0;w.Math.random=()=>draws++%2?.999:0;
+   m.values.delete('solfege-note-shooter-rates');m.fill=null;m.level=0;m.defer=false;
+   const connections=m.connected,before=(await w.SolfegeProgress.store.list()).length;
+   $('start').click();await until(()=>m.connected===connections+1);m.step(0);m.step(1550);
+   assert(d.querySelectorAll('#background .staff-lines').length===2&&d.querySelector('.grand-brace'),'Нет фортепианной системы');
+   assert(d.querySelector('[data-clef="treble"] .staff-key').textContent==='𝄞'&&d.querySelector('[data-clef="bass"] .staff-key').textContent==='𝄢','Не те ключи');
+   assert(d.querySelectorAll('#notes .note.moving').length===2,'Изменился интервал появления');
+   const y=node=>+(node.getAttribute('transform').match(/translate\([^ ]+ ([\d.-]+)\)/)||[])[1];
+   assert(y(d.querySelector('.note[data-clef="bass"]'))>y(d.querySelector('.note[data-clef="treble"]')),'Станы перепутаны');
+   assert(Math.abs(y($('ship'))-y(d.querySelector('.note[data-clef="bass"]')))<2,'Корабль не следует басовой цели');
+   m.midi=40;m.level=.2;for(let i=0;i<3;i++)m.step();
+   assert($('answers').textContent==='1'&&$('hint').textContent.includes('ми · большая октава'),'Басовая нота не засчитана');
+   assert($('ship').getAttribute('data-boost')==='1'&&/rotate\(-/.test($('ship').getAttribute('transform')),'Корабль не летит к верхнему стану');
+   const label=$('effects').querySelector('.note-fx.correct');
+   const upper=d.querySelector('[data-clef="treble"] .staff-lines').getBBox();
+   assert(+label.getAttribute('y')>upper.y+upper.height,'Подпись басовой ноты оказалась на верхнем стане');
+   m.level=0;m.step(100);m.step(100);m.midi=83;m.level=.2;for(let i=0;i<3;i++)m.step();
+   assert($('answers').textContent==='2'&&$('accuracy').textContent==='100%'&&$('hint').textContent.includes('си · 2-я октава'),'Скрипичная нота не засчитана');
+   await until(async()=>(await w.SolfegeProgress.store.list()).length===before+2);
+   const rows=(await w.SolfegeProgress.store.list()).slice(-2);
+   assert(rows.every(r=>r.mode.clef==='both'&&r.correct),'Прогресс не отделён по режиму двух ключей');
+   assert(JSON.parse(m.values.get('solfege-note-shooter-settings')).clef==='both','Режим не сохраняется');
+   m.level=0;m.step(3000);$('pause').click();
+   for(const [width,height]of [[768,1024],[820,1180],[432,934],[393,852],[365,681]]){
+    frame.style.width=width+'px';frame.style.height=height+'px';
+    await until(()=>$('staff').viewBox.baseVal.width===$('stage').clientWidth);
+    const stage=$('stage').getBoundingClientRect(),top=d.querySelector('[data-clef="treble"] .staff-lines').getBoundingClientRect(),bottom=d.querySelector('[data-clef="bass"] .staff-lines').getBoundingClientRect();
+    assert(top.bottom<bottom.top&&bottom.bottom<stage.bottom,'Станы не помещаются');
+    for(const head of d.querySelectorAll('.note ellipse')){
+     const r=head.getBoundingClientRect();assert(r.top>=stage.top&&r.bottom<=stage.bottom,'Нота обрезана');
+    }
+    $('victory').hidden=false;assert($('victory').getBoundingClientRect().bottom<top.top,'Победа перекрывает верхний стан');$('victory').hidden=true;
+    assert(d.documentElement.scrollWidth===width&&d.querySelector('.metrics').getBoundingClientRect().bottom<=height,'Управление не помещается');
+   }
+   const reopened=document.createElement('iframe'),ready=new Promise(resolve=>reopened.onload=resolve);
+   reopened.srcdoc=html.replace('<head>','<head><base href="'+new URL('../',location.href).href+'">').replace('<script src="./progress-store.js"><'+'/script>','<script>'+isolated+'<'+'/script><script>'+mock+'mock.values=new Map('+JSON.stringify([...m.values])+');<'+'/script>');
+   document.body.append(reopened);await ready;
+   try{assert(reopened.contentDocument.getElementById('clef').value==='both'&&reopened.contentDocument.querySelectorAll('.staff-key').length===2,'Оба ключа не восстановились');}
+   finally{await reopened.contentWindow.SolfegeProgress.store.close();reopened.remove();}
+  });
 }catch(error){results.push({name:'Запуск стенда',ok:false,error:error.message});}
 finally{
  if(frame){

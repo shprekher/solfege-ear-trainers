@@ -68,6 +68,12 @@
         doc.dispatchEvent(new win.Event('visibilitychange')); await wait(() => $('answers').textContent === '75');
         const arcadeRows = $('errors').querySelectorAll('tbody tr');
         assert(arcadeRows.length === 1 && arcadeRows[0].cells[1].textContent === '3' && arcadeRows[0].cells[2].textContent === '2' && arcadeRows[0].cells[3].textContent === '33%', 'Вердикты разделили статистику одной целевой ноты');
+        await store.append({ ...arcade, id: 'arcade-both', mode: { ...arcade.mode, clef: 'both' } });
+        doc.dispatchEvent(new win.Event('visibilitychange')); await wait(() => $('answers').textContent === '76');
+        const both = [...$('mode').options].find(o => o.textContent.includes('Оба ключа'));
+        assert(both && $('mode').options.length === 2, 'Прогресс двух ключей смешался с басовым');
+        $('mode').value = both.value; $('mode').dispatchEvent(new win.Event('change'));
+        assert($('level').textContent === '0%', 'Неверная статистика режима двух ключей');
         results.push({ title: 'Нотная аркада: ключ, диапазон, темп, тайм-ауты', ok: true });
       }
     } catch (error) { results.push({ title: 'Страница, ширина ' + width, ok: false, error: error.message }); }

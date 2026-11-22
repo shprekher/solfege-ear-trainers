@@ -6,7 +6,7 @@
   const percent = rows => rows.length ? Math.round(rows.filter(a => a.correct).length / rows.length * 100) + '%' : '—';
   function status(text, error = false) { $('status').textContent = text; $('status').classList.toggle('error', error); }
   function modeLabel(mode, exercise) {
-    if (exercise === 'note-shooter') return (mode.clef === 'bass' ? 'Басовый ключ' : 'Скрипичный ключ') + ' · ' + mode.direction;
+    if (exercise === 'note-shooter') return (mode.clef === 'both' ? 'Оба ключа' : mode.clef === 'bass' ? 'Басовый ключ' : 'Скрипичный ключ') + ' · ' + mode.direction;
     if (exercise === 'play-the-note') return mode.direction;
     const parts = [];
     if (mode.voices) parts.push(mode.voices + ' голоса');
