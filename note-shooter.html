@@ -11,7 +11,7 @@
 main{width:min(100%,1080px);height:calc(100svh - max(12px,env(safe-area-inset-top)) - max(12px,env(safe-area-inset-bottom)));min-height:600px;margin:auto;display:flex;flex-direction:column;gap:12px}
 header{display:flex;align-items:center;justify-content:space-between;gap:12px;flex:none}h1{font:900 clamp(21px,4vw,30px)/1.2 var(--mono);letter-spacing:-.04em;margin:0}a{color:var(--blue);text-underline-offset:3px}.back{font-size:13px;white-space:nowrap}
 .arena{display:flex;flex-direction:column;flex:1;min-height:0;background:#fff;border:2px solid var(--edge);box-shadow:3px 3px 0 #dce3ed;overflow:hidden}
-.hud{display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:14px;padding:12px 16px;border-bottom:3px double var(--edge);background:linear-gradient(#fff,var(--metal));flex:none}.hearts{display:flex;gap:5px;color:var(--red)}.hearts svg{width:21px;height:19px;fill:currentColor}.lost{color:#b9c2d0}.tuner{justify-self:end;width:min(100%,230px);min-width:0}#heard{display:block;font:650 13px/1.4 var(--mono);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.meter{height:8px;background:#d4dbe7;border:1px solid #a1aec2;overflow:hidden;margin-top:5px}.meter span{display:block;height:100%;width:0;background:repeating-linear-gradient(90deg,#2447ae 0 6px,#4467c9 6px 8px)}
+.hud{display:grid;grid-template-columns:auto minmax(0,1fr) auto auto;align-items:center;gap:14px;padding:12px 16px;border-bottom:3px double var(--edge);background:linear-gradient(#fff,var(--metal));flex:none}.hearts{display:flex;gap:5px;color:var(--red)}.hearts svg{width:21px;height:19px;fill:currentColor}.lost{color:#b9c2d0}.tuner{justify-self:end;width:min(100%,230px);min-width:0}.tempo{font:800 14px/1.4 var(--mono);color:var(--blue);white-space:nowrap}#heard{display:block;font:650 13px/1.4 var(--mono);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.meter{height:8px;background:#d4dbe7;border:1px solid #a1aec2;overflow:hidden;margin-top:5px}.meter span{display:block;height:100%;width:0;background:repeating-linear-gradient(90deg,#2447ae 0 6px,#4467c9 6px 8px)}
 button,select{font:inherit;min-height:44px;border:1px solid var(--edge);border-radius:2px;padding:8px 12px;background:#fff;color:var(--ink)}button{font-weight:700;cursor:pointer;touch-action:manipulation;box-shadow:inset 0 -3px #d5deec}button.primary{background:#263f9d;color:#fff;box-shadow:inset 0 2px #8299f0,inset 0 -3px #15265c}button:disabled{opacity:.5;cursor:default}button:focus-visible,a:focus-visible,select:focus-visible{outline:2px solid var(--blue);outline-offset:3px}
 .stage{position:relative;flex:1;min-height:0;background:#fff;isolation:isolate}#staff{display:block;width:100%;height:100%;overflow:hidden;position:absolute;inset:0}.staff-lines{stroke:#000;stroke-width:1.2}.answer-line{stroke:#4963a1;stroke-dasharray:5 7;stroke-width:1.5}.line-label{font:700 10px var(--mono);fill:var(--blue)}.staff-key{font-family:Bravura,"Noto Music","Apple Symbols",serif;fill:#000}.note{color:#000}.pixel-sprite,.pixel-particle{shape-rendering:crispEdges}.note-fx{font:800 21px var(--mono);paint-order:stroke fill;stroke:#fff;stroke-width:6;stroke-linejoin:round}.note-fx.correct{fill:#15763c}.note-fx.wrong,.note-fx.timeout{fill:#a3162f}
 #ship .flame{display:none}#ship[data-thrust="0"] .flame-a,#ship[data-thrust="1"] .flame-b,#ship[data-thrust="2"] .flame-c{display:inline}#ship[data-boost="1"] .flame{display:none}#ship[data-boost="1"] .flame-d{display:inline}#ship .canopy-glint{opacity:.25}#ship[data-thrust="2"] .canopy-glint{opacity:.8}
@@ -20,7 +20,7 @@ button,select{font:inherit;min-height:44px;border:1px solid var(--edge);border-r
 .stage.shake{animation:shake .4s ease-out}.stage.frozen{animation-play-state:paused}
 .victory{position:absolute;left:0;right:0;top:0;height:36%;z-index:4;display:flex;align-items:center;justify-content:center;overflow:hidden;pointer-events:none;background:linear-gradient(#eef4ffaa,#fff0 78%)}.victory[hidden]{display:none}.victory-stars{position:absolute;inset:0}.victory-stars i{position:absolute;bottom:-6px;left:var(--x);width:var(--s);height:var(--s);background:var(--c);box-shadow:0 0 6px var(--c);animation:star-rise var(--d) linear forwards}.victory-ship{position:absolute;left:-42px;bottom:18%;width:34px;height:22px;animation:ship-fly 1.25s linear forwards}@keyframes star-rise{from{transform:translateY(18px);opacity:1}to{transform:translateY(calc(-1*var(--h)));opacity:0}}@keyframes ship-fly{to{left:calc(100% + 42px)}}.victory-card{position:relative;z-index:1;text-align:center;font-family:var(--mono);border:2px solid #263f9d;padding:5px 14px;background:#fffffff2;box-shadow:3px 3px 0 #b32949;transform:skewX(-4deg);max-width:92%}.victory-card span{display:block;font-size:10px;letter-spacing:.3em;color:#263f9d}.victory-card strong{display:block;font-size:clamp(20px,5vw,30px);letter-spacing:-.04em;color:#17233c;text-shadow:2px 2px 0 #b32949;margin:1px 0}.victory-card small{font-size:11px;color:#8a5b00}@media(prefers-reduced-motion:reduce){.victory-stars i,.victory-ship{display:none}}
 @keyframes shake{0%,100%{transform:translateX(0)}20%,60%{transform:translateX(-7px)}40%,80%{transform:translateX(6px)}}
-@media(max-width:420px){main{gap:8px;min-height:580px}.hud{gap:8px;padding:10px}.hearts svg{width:17px;height:15px}.hud button{padding:7px 9px}#heard{font-size:12px}.panel{padding:16px}.panel h2{font-size:22px}.settings{gap:8px;margin:12px 0}.back{font-size:11px}.bottom{font-size:11px}}
+@media(max-width:420px){main{gap:8px;min-height:580px}.hud{gap:8px;padding:10px}.hearts svg{width:17px;height:15px}.hud button{padding:7px 9px}.tempo{font-size:12px}#heard{font-size:12px}.panel{padding:16px}.panel h2{font-size:22px}.settings{gap:8px;margin:12px 0}.back{font-size:11px}.bottom{font-size:11px}}
 @media(prefers-reduced-motion:reduce){.stage.shake{animation:none}}
 </style>
 </head>
@@ -30,6 +30,7 @@ button,select{font:inherit;min-height:44px;border:1px solid var(--edge);border-r
 <div class="hud">
  <div class="hearts" id="hearts" role="img" aria-label="Жизни: 3"></div>
  <div class="tuner"><span id="heard">Слышу: —</span><div class="meter" id="meter" role="meter" aria-label="Уровень микрофона" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><span id="level"></span></div></div>
+ <span class="tempo" id="tempo" title="Темп, ударов в минуту">♩=80</span>
  <button id="pause" disabled aria-label="Пауза">Пауза</button>
 </div>
 <div class="stage" id="stage">
@@ -190,25 +191,34 @@ window.NoteShooter=Object.freeze({CONFIG,createGame,noteName,noteSteps,weightedP
 
 const $=id=>document.getElementById(id), P=window.PitchDetector, progress=window.SolfegeProgress.tracker('note-shooter');
 const intro=$('screenText').textContent;
-const settingsKey='solfege-note-shooter-settings',bestKey='solfege-note-shooter-best',ratesKey='solfege-note-shooter-rates';
+const settingsKey='solfege-note-shooter-settings';
+// Records and error rates belong to a mode: a streak at 40 BPM is not a streak
+// at 160, and mistakes in extended bass must not weight basic treble notes.
+// Records use the tempo the player chose; wave raises live only inside a game.
+const bestKeyFor=s=>`solfege-note-shooter-best:${s.clef}:${s.range}:${s.bpm}`;
+const ratesKeyFor=s=>`solfege-note-shooter-rates:${s.clef}:${s.range}`;
 let allTimeBest=0;
 try{
  const saved=JSON.parse(localStorage.getItem(settingsKey)||'{}');
  if(['treble','bass','both'].includes(saved.clef))$('clef').value=saved.clef;
  if(['basic','extended'].includes(saved.range))$('range').value=saved.range;
  if(Number.isInteger(saved.bpm)&&saved.bpm>=CONFIG.minBpm&&saved.bpm<=CONFIG.maxBpm&&saved.bpm%CONFIG.bpmStep===0)$('bpm').value=saved.bpm;
- const best=Number(localStorage.getItem(bestKey));if(Number.isSafeInteger(best)&&best>=0)allTimeBest=best;
 }catch{}
 const readSettings=()=>({clef:$('clef').value,range:$('range').value,bpm:+$('bpm').value});
 function saveSettings(){try{localStorage.setItem(settingsKey,JSON.stringify(readSettings()));}catch{}}
-function readRates(){
+function loadBest(){
+ allTimeBest=0;
+ try{const best=Number(localStorage.getItem(bestKeyFor(readSettings())));if(Number.isSafeInteger(best)&&best>=0)allTimeBest=best;}catch{}
+}
+loadBest();
+function readRates(s){
  try{
-  const saved=JSON.parse(localStorage.getItem(ratesKey)||'{}'),clean={};
+  const saved=JSON.parse(localStorage.getItem(ratesKeyFor(s))||'{}'),clean={};
   for(const [key,value]of Object.entries(saved))if(Number.isFinite(+value)&&+value>=0&&+value<=1)clean[key]=+value;
   return clean;
  }catch{return{}}
 }
-function saveRates(){try{localStorage.setItem(ratesKey,JSON.stringify(game.rates));}catch{}}
+function saveRates(){try{localStorage.setItem(ratesKeyFor(game.settings),JSON.stringify(game.rates));}catch{}}
 function rangeHint(){
  const s=readSettings(),pool=notePool(s),keys=s.clef==='both'?['treble','bass']:[s.clef];
  const ranges=keys.map(clef=>{
@@ -218,7 +228,9 @@ function rangeHint(){
  $('rangeHint').textContent=`${ranges}. До линии: ${(8*60/s.bpm).toFixed(1).replace('.',',')} с. Новая нота каждые ${(2*60/s.bpm).toFixed(2).replace('.',',')} с.`;
 }
 for(const id of ['clef','range','bpm'])$(id).addEventListener('change',()=>{
- saveSettings();rangeHint();if(!game){layout();render();}
+ saveSettings();rangeHint();loadBest();stats();
+ if(view==='over')$('result').textContent=resultText();
+ if(!game){layout();render();}
 });
 let game=null,view='start',frame=0,lastFrame=null,generation=0,context=null,stream=null,source=null,analyser=null;
 const pitchProfile=Object.freeze({minClarity:.88,window:6,minHits:2});
@@ -251,10 +263,18 @@ function stats(){
   heart.append(svg('path',{d:heartPath}));return heart;
  }));
  $('hearts').setAttribute('aria-label','Жизни: '+(g?.lives??CONFIG.lives.basic));
+ updateTempo();
 }
+// During a session the HUD shows the wave tempo; on start/over screens it shows
+// the player's chosen tempo, which victory raises never overwrite.
+function updateTempo(){
+ const active=['playing','paused','victory','loading'].includes(view);
+ $('tempo').textContent='♩='+(active&&game?game.bpm:readSettings().bpm);
+}
+function resultText(){return `Счёт: ${game.correct} · Точность: ${game.answers?Math.round(game.correct/game.answers*100):0}% · Рекорд серии: ${allTimeBest}`;}
 function saveBest(){
  if(game.best<=allTimeBest)return;allTimeBest=game.best;
- try{localStorage.setItem(bestKey,String(allTimeBest));}catch{$('hint').textContent='Рекорд не сохранится после закрытия: локальное хранилище недоступно.';}
+ try{localStorage.setItem(bestKeyFor(game.settings),String(allTimeBest));}catch{$('hint').textContent='Рекорд не сохранится после закрытия: локальное хранилище недоступно.';}
 }
 function blockMic(){
  const now=(game?.time||0)*1000;
@@ -282,7 +302,8 @@ function showScreen(type,message=''){
  $('screenTitle').textContent={start:'Нотная аркада',loading:'Подключаем микрофон',paused:'Пауза',over:'Игра окончена'}[type]||'';
  $('screenText').textContent={start:intro,loading:'Разрешите микрофон. Ноты начнут двигаться только после подключения.',paused:'Ноты и время остановлены. Для продолжения нажмите «Продолжить» и сыграйте с нового нажатия.',over:'Настройте следующую игру или попробуйте ещё раз.'}[type]||'';
  $('start').textContent=type==='paused'?'Продолжить':type==='over'?'Ещё раз':'Старт';
- if(type==='over')$('result').textContent=`Счёт: ${game.correct} · Точность: ${game.answers?Math.round(game.correct/game.answers*100):0}% · Рекорд серии: ${allTimeBest}`;
+ if(type==='over')$('result').textContent=resultText();
+ updateTempo();
 }
 function releaseAudio(){
  generation++;cancelAnimationFrame(frame);frame=0;lastFrame=null;clearVictory();
@@ -325,7 +346,8 @@ function celebrate(noteText){
 }
 function onVictory(g){
  const next=Math.min(CONFIG.maxBpm,g.bpm+CONFIG.bpmStep),changed=next>g.bpm;
- if(changed){g.setBpm(next);$('bpm').value=String(next);saveSettings();rangeHint();}
+ // The raise applies to this game only; the saved setting stays the player's choice.
+ if(changed)g.setBpm(next);
  stats();
  celebrate('ЖИЗНИ ВОССТАНОВЛЕНЫ · '+(changed?'ТЕМП +10 → '+next:'ТЕМП 160'));
 }
@@ -334,7 +356,8 @@ function newGame(){
  shipCurrentY=null;
  stable.reset();attack=P.onset();noise=P.noiseFloor({minThreshold:.0022,multiplier:2.5});muteUntil=0;lastLevel=0;targetHits=0;
  confirmed=null;confirmedUntil=0;
- game=createGame(readSettings(),{best:allTimeBest,onVerdict,onCollision,onVictory,rates:readRates()});game.pause();stats();layout();render();
+ const s=readSettings();loadBest();
+ game=createGame(s,{best:allTimeBest,onVerdict,onCollision,onVictory,rates:readRates(s)});game.pause();stats();layout();render();
 }
 async function start(){
  if(view==='loading'||view==='playing')return;

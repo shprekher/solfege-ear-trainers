@@ -252,7 +252,8 @@ try{
   assert(rows.length===4&&rows.filter(r=>r.task.endsWith(':timeout')).length===2,'Нет отдельных тайм-аутов');
   assert(rows.every(r=>r.exercise==='note-shooter'&&r.mode.clef==='treble'&&r.mode.direction.includes('80')),'ID и режим');
   assert($('result').textContent.includes('Счёт: 1')&&$('result').textContent.includes('25%'),'Итоги');
-  assert(m.values.get('solfege-note-shooter-best')==='1'&&$('best').textContent==='1','Рекорд не сохранён');
+  assert(m.values.get('solfege-note-shooter-best:treble:basic:80')==='1'&&!m.values.has('solfege-note-shooter-best')&&$('best').textContent==='1','Рекорд не сохранён по режиму');
+  assert(m.values.has('solfege-note-shooter-rates:treble:basic')&&!m.values.has('solfege-note-shooter-rates'),'Веса не отделены по режиму');
   assert(m.stopped===1&&!m.callbacks.size,'Микрофон не выключен');
   assert(m.outputAttempts===0&&!$('sounds'),'Игра пытается воспроизвести звук');
   assert(!$('settingsBox').hidden&&$('start').textContent==='Ещё раз','Нет настроек и повтора');
@@ -261,7 +262,8 @@ try{
   $('clef').value='bass';$('range').value='extended';$('bpm').value='160';
   for(const id of ['clef','range','bpm'])$(id).dispatchEvent(new w.Event('change'));
   $('start').click();await until(()=>m.connected===2);
-  assert(m.fftSize===8192&&$('answers').textContent==='0'&&$('best').textContent==='1','Новая игра');
+  assert(m.fftSize===8192&&$('answers').textContent==='0'&&$('best').textContent==='0','Новая игра унаследовала чужой рекорд');
+  assert(!m.values.has('solfege-note-shooter-rates:bass:extended'),'Веса чужого режима перенесены в новый');
   m.step(0);m.step(1000);$('pause').click();
   const before=$('notes').innerHTML,thrust=$('ship').getAttribute('data-thrust');m.step(20000);
   assert($('notes').innerHTML===before&&$('ship').getAttribute('data-thrust')===thrust&&m.stopped===2,'Движение на паузе');
@@ -295,13 +297,16 @@ try{
   document.body.append(reopened);await ready;
   try{
    const rd=reopened.contentDocument,get=id=>rd.getElementById(id);
-   assert(get('best').textContent==='1'&&get('clef').value==='bass'&&get('range').value==='extended'&&get('bpm').value==='160','Не восстановлены значения');
+   assert(get('best').textContent==='0'&&get('clef').value==='bass'&&get('range').value==='extended'&&get('bpm').value==='160','Не восстановлены значения');
    assert(get('answers').textContent==='0'&&get('screenTitle').textContent==='Нотная аркада','Восстановлена незавершённая игра');
+   get('clef').value='treble';get('range').value='basic';get('bpm').value='80';
+   for(const id of ['clef','range','bpm'])get(id).dispatchEvent(new reopened.contentWindow.Event('change'));
+   assert(get('best').textContent==='1','Рекорд своего режима не восстановился');
   }finally{await reopened.contentWindow.SolfegeProgress.store.close();reopened.remove();}
  });
   await test('Аркада засчитывает соль второй октавы с растянутым строем и си подряд',async()=>{
   $('clef').value='treble';$('range').value='extended';$('bpm').value='80';
-  let draws=0;m.values.delete('solfege-note-shooter-rates');w.Math.random=()=>draws++===0?12.2/15:13.2/14;
+  let draws=0;m.values.delete('solfege-note-shooter-rates:treble:extended');w.Math.random=()=>draws++===0?12.2/15:13.2/14;
   m.defer=false;m.level=0;$('start').click();await until(()=>m.connected===5);
   m.step(0);m.step(1600);
   const first= m.now-20;
@@ -323,7 +328,7 @@ try{
    $('finish').click();$('clef').value='both';$('range').value='extended';$('bpm').value='80';
    for(const id of ['clef','range','bpm'])$(id).dispatchEvent(new w.Event('change'));
    let draws=0;w.Math.random=()=>draws++%2?.999:0;
-   m.values.delete('solfege-note-shooter-rates');m.fill=null;m.level=0;m.defer=false;
+   m.values.delete('solfege-note-shooter-rates:both:extended');m.fill=null;m.level=0;m.defer=false;
    const connections=m.connected,before=(await w.SolfegeProgress.store.list()).length;
    $('start').click();await until(()=>m.connected===connections+1);m.step(0);m.step(1550);
    assert(d.querySelectorAll('#background .staff-lines').length===2&&d.querySelector('.grand-brace'),'Нет фортепианной системы');
@@ -368,6 +373,39 @@ try{
     assert(JSON.parse(reopened.contentWindow.mock.values.get('solfege-note-shooter-settings')).bpm===50,'Темп 50 не сохраняется');
    }
    finally{await reopened.contentWindow.SolfegeProgress.store.close();reopened.remove();}
+  });
+  await test('Победа: темп волны не перезаписывает настройку, рекорд привязан к режиму',async()=>{
+   $('finish').click();
+   $('clef').value='treble';$('range').value='basic';$('bpm').value='80';
+   for(const id of ['clef','range','bpm'])$(id).dispatchEvent(new w.Event('change'));
+   w.Math.random=()=>0;m.values.delete('solfege-note-shooter-rates:treble:basic');
+   m.fill=null;m.level=0;m.defer=false;
+   const connections=m.connected;
+   $('start').click();await until(()=>m.connected===connections+1);
+   m.step(0);
+   for(let i=0;i<50;i++){
+    m.level=0;m.step(100);m.step(100);m.step(1240);
+    m.midi=i%2?62:60;m.level=.2;
+    m.step();m.step();m.step();
+    assert($('answers').textContent===String(i+1),'Ответ '+(i+1)+' не засчитан');
+   }
+   assert(!$('victory').hidden,'Нет заставки победы');
+   await until(()=>$('victory').hidden);
+   assert($('bpm').value==='80'&&JSON.parse(m.values.get('solfege-note-shooter-settings')).bpm===80,'Темп волны перезаписал настройку');
+   assert($('tempo').textContent==='♩=90','HUD не показывает темп волны');
+   assert(m.values.get('solfege-note-shooter-best:treble:basic:80')==='50'&&!m.values.has('solfege-note-shooter-best:treble:basic:90'),'Рекорд не привязан к выбранному темпу');
+   assert($('best').textContent==='50','Рекорд серии не показан');
+   $('finish').click();
+   assert($('tempo').textContent==='♩=80','На итогах показан темп волны вместо выбранного');
+   $('start').click();await until(()=>m.connected===connections+2);
+   m.step(0);
+   assert($('tempo').textContent==='♩=80','Новая игра началась с темпа волны');
+   m.level=0;m.step(100);m.step(100);m.step(1240);m.midi=60;m.level=.2;
+   m.step();m.step();m.step();
+   assert($('answers').textContent==='1','Первая нота новой игры не засчитана');
+   const rows=await w.SolfegeProgress.store.list();
+   assert(rows[rows.length-1].mode.direction.includes('80'),'Прогресс новой игры записал темп волны');
+   $('pause').click();
   });
 }catch(error){results.push({name:'Запуск стенда',ok:false,error:error.message});}
 finally{
