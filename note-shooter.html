@@ -42,7 +42,7 @@ button,select{font:inherit;min-height:44px;border:1px solid var(--edge);border-r
    <div class="settings">
     <label>Ключ<select id="clef"><option value="treble">Скрипичный</option><option value="bass">Басовый</option><option value="both">Оба ключа</option></select></label>
     <label>Диапазон<select id="range"><option value="basic">Базовый</option><option value="extended">Расширенный</option></select></label>
-    <label class="wide">Темп, ударов в минуту<select id="bpm"><option>60</option><option>70</option><option selected>80</option><option>90</option><option>100</option><option>110</option><option>120</option><option>130</option><option>140</option><option>150</option><option>160</option></select></label>
+    <label class="wide">Темп, ударов в минуту<select id="bpm"><option>40</option><option>50</option><option>60</option><option>70</option><option selected>80</option><option>90</option><option>100</option><option>110</option><option>120</option><option>130</option><option>140</option><option>150</option><option>160</option></select></label>
    </div>
    <p class="range-hint" id="rangeHint"></p>
     <p class="small">Играйте по одной ноте без педали. В режиме «Оба ключа» ноты появляются на верхнем или нижнем стане. После ответа отпустите клавишу и дайте звуку затихнуть. Игра не издаёт звуков.</p>
@@ -69,7 +69,7 @@ const CONFIG = Object.freeze({
   bass: Object.freeze({basic:Object.freeze([43,57]),extended:Object.freeze([40,60])})
  }),
  shipX:.12, lineX:.38, spawnX:.95, travelBeats:8, spawnBeats:2,
- doomSeconds:.6, cooldownMs:65, lives:Object.freeze({basic:3,extended:5}), minBpm:60, maxBpm:160, bpmStep:10,
+ doomSeconds:.6, cooldownMs:65, lives:Object.freeze({basic:3,extended:5}), minBpm:40, maxBpm:160, bpmStep:10,
  victoryNotes:50, adaptive:Object.freeze({bias:4,maxWeight:5,decay:.85,errorBoost:.35})
 });
 const natural=[0,2,4,5,7,9,11], syllables=['до','ре','ми','фа','соль','ля','си'];
@@ -196,7 +196,7 @@ try{
  const saved=JSON.parse(localStorage.getItem(settingsKey)||'{}');
  if(['treble','bass','both'].includes(saved.clef))$('clef').value=saved.clef;
  if(['basic','extended'].includes(saved.range))$('range').value=saved.range;
- if(Number.isInteger(saved.bpm)&&saved.bpm>=60&&saved.bpm<=160&&saved.bpm%10===0)$('bpm').value=saved.bpm;
+ if(Number.isInteger(saved.bpm)&&saved.bpm>=CONFIG.minBpm&&saved.bpm<=CONFIG.maxBpm&&saved.bpm%CONFIG.bpmStep===0)$('bpm').value=saved.bpm;
  const best=Number(localStorage.getItem(bestKey));if(Number.isSafeInteger(best)&&best>=0)allTimeBest=best;
 }catch{}
 const readSettings=()=>({clef:$('clef').value,range:$('range').value,bpm:+$('bpm').value});

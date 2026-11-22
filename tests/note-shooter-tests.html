@@ -126,8 +126,10 @@ try{
   g.advance(.01);assert(events.length===1&&events[0].outcome==='timeout'&&first.state==='doomed'&&near(first.x,C.lineX),'Пересечение линии');
   assert(g.target().id!==first.id,'Цель не переключилась');
  });
- await test('Темп 60–160 определяет скорость и интервал в битах',()=>{
-  for(let bpm=60;bpm<=160;bpm+=10){
+ await test('Темп 40–160 определяет скорость и интервал в битах',()=>{
+  assert($('bpm').querySelector('option[selected]').value==='80','Темп по умолчанию изменился');
+  for(let bpm=40;bpm<=160;bpm+=10){
+   assert([...$('bpm').options].some(o=>+o.value===bpm),'Нет выбора темпа '+bpm);
    const events=[],g=create({bpm},{onVerdict:e=>events.push(e)});
    const travel=8*60/bpm,interval=2*60/bpm;
    assert(near(g.notes[0].speed,(C.spawnX-C.lineX)/travel),'Скорость');
@@ -152,6 +154,8 @@ try{
   assert(victories.length===1,'Победа повторилась сразу');
   g.setBpm(90);assert(g.bpm===90&&g.beat===60/90,'Темп не изменился');
   g.setBpm(200);assert(g.bpm===160,'Темп не ограничен');
+  g.setBpm(30);assert(g.bpm===40,'Минимальный темп не 40');
+  g.setBpm(g.bpm+10);assert(g.bpm===50,'Нет повышения 40 → 50');
  });
  await test('Верный ответ: hit, +1, серия и следующая цель сразу',()=>{
   const events=[],g=create({}, {onVerdict:e=>events.push(e),best:4});g.advance(3);
@@ -352,10 +356,17 @@ try{
     $('victory').hidden=false;assert($('victory').getBoundingClientRect().bottom<top.top,'Победа перекрывает верхний стан');$('victory').hidden=true;
     assert(d.documentElement.scrollWidth===width&&d.querySelector('.metrics').getBoundingClientRect().bottom<=height,'Управление не помещается');
    }
+   $('bpm').value='40';$('bpm').dispatchEvent(new w.Event('change'));
    const reopened=document.createElement('iframe'),ready=new Promise(resolve=>reopened.onload=resolve);
    reopened.srcdoc=html.replace('<head>','<head><base href="'+new URL('../',location.href).href+'">').replace('<script src="./progress-store.js"><'+'/script>','<script>'+isolated+'<'+'/script><script>'+mock+'mock.values=new Map('+JSON.stringify([...m.values])+');<'+'/script>');
    document.body.append(reopened);await ready;
-   try{assert(reopened.contentDocument.getElementById('clef').value==='both'&&reopened.contentDocument.querySelectorAll('.staff-key').length===2,'Оба ключа не восстановились');}
+   try{
+    assert(reopened.contentDocument.getElementById('clef').value==='both'&&reopened.contentDocument.querySelectorAll('.staff-key').length===2,'Оба ключа не восстановились');
+    assert(reopened.contentDocument.getElementById('bpm').value==='40','Темп 40 не восстановился');
+    reopened.contentDocument.getElementById('bpm').value='50';
+    reopened.contentDocument.getElementById('bpm').dispatchEvent(new reopened.contentWindow.Event('change'));
+    assert(JSON.parse(reopened.contentWindow.mock.values.get('solfege-note-shooter-settings')).bpm===50,'Темп 50 не сохраняется');
+   }
    finally{await reopened.contentWindow.SolfegeProgress.store.close();reopened.remove();}
   });
 }catch(error){results.push({name:'Запуск стенда',ok:false,error:error.message});}
