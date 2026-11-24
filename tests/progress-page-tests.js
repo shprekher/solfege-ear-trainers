@@ -75,6 +75,16 @@
         $('mode').value = both.value; $('mode').dispatchEvent(new win.Event('change'));
         assert($('level').textContent === '0%', 'Неверная статистика режима двух ключей');
         results.push({ title: 'Нотная аркада: ключ, диапазон, темп, тайм-ауты', ok: true });
+        const all = { ...records[0], id: 'exercise8', exercise: 'intervals-all', mode: { timbre: 'piano', intervalType: 'harmonic' }, task: '10:together', expected: 'малая септима', actual: 'большая септима', correct: false };
+        await store.append(all);
+        await store.append({ ...all, id: 'exercise8-electric', mode: { ...all.mode, timbre: 'electric' }, task: '11:together', expected: 'большая септима', correct: true });
+        doc.dispatchEvent(new win.Event('visibilitychange')); await wait(() => $('answers').textContent === '78');
+        $('exercise').value = 'intervals-all'; $('exercise').dispatchEvent(new win.Event('change'));
+        assert($('mode').options.length === 2 && $('mode').textContent.includes('Гармонический'), 'Нет отдельных тембров упражнения 8');
+        assert($('level').textContent === '100%' && $('errors').textContent.includes('Большая септима · одновременно'), 'Не показана большая септима');
+        $('mode').selectedIndex = 0; $('mode').dispatchEvent(new win.Event('change'));
+        assert($('level').textContent === '0%' && $('errors').textContent.includes('Малая септима · одновременно'), 'Не показана малая септима');
+        results.push({ title: 'Отдельный прогресс упражнения 8: септимы и тембры', ok: true });
       }
     } catch (error) { results.push({ title: 'Страница, ширина ' + width, ok: false, error: error.message }); }
     finally { await win.SolfegeProgress.store.close(); frame.remove(); }

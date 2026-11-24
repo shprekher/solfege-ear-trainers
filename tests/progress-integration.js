@@ -42,12 +42,13 @@
       if (exercise === 'shifted-voice') { doc.querySelector('[data-voice="' + correctData.voice + '"]').click(); doc.querySelector('[data-direction="' + correctData.direction + '"]').click(); }
       else if (exercise === 'half-step') doc.querySelector('[data-direction="' + correctData.direction + '"]').click();
       else if (exercise === 'count-notes') doc.querySelector('[data-guess="' + correctData.guess + '"]').click();
-      else if (exercise === 'intervals' || exercise === 'intervals-extended') doc.querySelector('[data-interval="' + correctData.interval + '"]').click();
+      else if (correctData.interval) doc.querySelector('[data-interval="' + correctData.interval + '"]').click();
       else doc.querySelector('[data-letter="' + correctData.letter + '"]').click();
       await wait(async () => (await store.list()).filter(a => a.exercise === exercise).length === 2);
       const rows = (await store.list()).filter(a => a.exercise === exercise);
       assert(rows[1].correct && rows[1].sessionId !== first.sessionId, 'Неверный ответ или идентификатор новой тренировки');
       assert(rows.every(a => a.mode.timbre && a.task && a.expected && a.actual), 'Не записаны детали');
+      if (exercise === 'intervals-all') assert(rows.every(a => a.mode.intervalType === 'harmonic' && a.task.endsWith(':together')), 'Нарушена запись гармонического интервала');
       assert(errors.length === 0, errors.join('; '));
       results.push({ exercise, ok: true, modes: rows.map(a => a.mode) });
     } catch (error) { results.push({ exercise, ok: false, error: error.message }); }

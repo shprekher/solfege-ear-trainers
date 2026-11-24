@@ -45,6 +45,11 @@
       "original": "new exercise based on intervals.html",
       "sha256_original": null,
       "sha256_packaged": "505ddf8ce8f4d5ad001154287bb560b79cdefb03e5c530d999bd5257e87ed28e"
+    },
+    "intervals-all.html": {
+      "original": "new exercise based on intervals.html and intervals-extended.html",
+      "sha256_original": null,
+      "sha256_packaged": "70092861ee8d2ec82fbcd4bb403750cfe6c68bb6a06dec99651d11f371c98ac5"
     }
   }
 }

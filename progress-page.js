@@ -23,9 +23,9 @@
     if (answer.exercise === 'half-step') return answer.task === 'up' ? 'Второй звук выше' : 'Второй звук ниже';
     if (answer.exercise === 'count-notes') return answer.expected + ' ноты';
     if (answer.exercise === 'shifted-voice') return answer.expected;
-    if (answer.exercise === 'intervals' || answer.exercise === 'intervals-extended') {
+    if (answer.exercise === 'intervals' || answer.exercise === 'intervals-extended' || answer.exercise === 'intervals-all') {
       const [distance, direction] = answer.task.split(':');
-      const name = { 1: 'Малая секунда', 2: 'Большая секунда', 3: 'Малая терция', 4: 'Большая терция', 5: 'Чистая кварта', 7: 'Чистая квинта', 8: 'Малая секста', 9: 'Большая секста' }[distance] || answer.expected;
+      const name = { 1: 'Малая секунда', 2: 'Большая секунда', 3: 'Малая терция', 4: 'Большая терция', 5: 'Чистая кварта', 7: 'Чистая квинта', 8: 'Малая секста', 9: 'Большая секста', 10: 'Малая септима', 11: 'Большая септима' }[distance] || answer.expected;
       return name + (direction === 'up' ? ' ↑' : direction === 'down' ? ' ↓' : ' · одновременно');
     }
     const [note, language] = answer.task.split(':');
@@ -136,7 +136,7 @@
   }));
   $('delete').addEventListener('click', () => action(async () => {
     if (!confirm('Удалить всю историю тренировок в этом браузере? Это действие нельзя отменить. Сначала можно экспортировать JSON.')) return;
-    await P.store.clear(); try { localStorage.removeItem('intervals-record'); localStorage.removeItem('intervals-extended-record'); } catch {}
+    await P.store.clear(); try { localStorage.removeItem('intervals-record'); localStorage.removeItem('intervals-extended-record'); localStorage.removeItem('intervals-all-record'); } catch {}
     await reload(); status('Локальная история удалена. Новые ответы будут записываться заново.');
   }));
   window.addEventListener('pageshow', event => { if (event.persisted) action(reload); });

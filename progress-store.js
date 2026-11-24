@@ -11,7 +11,8 @@
     intervals: '5 · Какой интервал?',
     'intervals-extended': '6 · Кварта, квинта и сексты',
     'play-the-note': '7 · Сыграй ноту',
-    'note-shooter': '7 · Сыграй ноту — аркада'
+    'note-shooter': '7 · Сыграй ноту — аркада',
+    'intervals-all': '8 · Все интервалы'
   });
   const own = (o, key) => Object.prototype.hasOwnProperty.call(o, key);
   const dayKey = (date = new Date()) => [date.getFullYear(), String(date.getMonth() + 1).padStart(2, '0'), String(date.getDate()).padStart(2, '0')].join('-');
