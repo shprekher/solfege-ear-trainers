@@ -4,7 +4,7 @@
     "note-shooter.html": {
       "original": "new arcade exercise based on play-the-note.html",
       "sha256_original": null,
-      "sha256_packaged": "f4987570dd63c318d69830fa209aac2ac65c60f158486edbb9dab01910239d6a"
+      "sha256_packaged": "3212308172ceaddcb4e43329b3b249f34a5995cb4e3d9e0e7cc7ba94c6e93feb"
     },
     "play-the-note.html": {
       "original": "new microphone exercise based on note-reading.html",
@@ -14,7 +14,7 @@
     "intervals.html": {
       "original": "solfege_intervals_v3.html",
       "sha256_original": "26b668f348ce22a124dc5fb7ef9f03af1a1f06632c1265d16205f6a1acf2a150",
-      "sha256_packaged": "c360bb04274636134d6da0b6ab490c034e9ccc920a94a06fb554e0243de756a1"
+      "sha256_packaged": "04e80f2193186bfe6c8d8a704e48adabf891be5473c036aaa59190cd722862cf"
     },
     "note-reading.html": {
       "original": "new exercise based on note-names.html",
@@ -44,12 +44,12 @@
     "intervals-extended.html": {
       "original": "new exercise based on intervals.html",
       "sha256_original": null,
-      "sha256_packaged": "505ddf8ce8f4d5ad001154287bb560b79cdefb03e5c530d999bd5257e87ed28e"
+      "sha256_packaged": "ad517f1168f88a25b5ce1198afde7a45e9b2e045d9dede6055caeb6653e99850"
     },
     "intervals-all.html": {
       "original": "new exercise based on intervals.html and intervals-extended.html",
       "sha256_original": null,
-      "sha256_packaged": "70092861ee8d2ec82fbcd4bb403750cfe6c68bb6a06dec99651d11f371c98ac5"
+      "sha256_packaged": "e9fb4f4cdd3ec731b5bff48fb546033420a6af7f50ef0c853b98210c7ad7dada"
     }
   }
 }

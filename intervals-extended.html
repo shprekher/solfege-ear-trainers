@@ -190,9 +190,9 @@ function scheduleAdvance(delay){cancelTransition();transition=setTimeout(()=>{tr
 function play(slow=false){
  if(!round||(state!=='question'&&state!=='review'))return;
  clearPlaybackTimers();
- const harmonic=intervalType==='harmonic';
+ const harmonic=intervalType==='harmonic'&&!slow;
  const wait=Math.max(0,busyUntil-performance.now()),gap=harmonic?0:(slow?.83:.62),d1=harmonic?(slow?1.5:1.35):(slow?.67:.53),d2=harmonic?d1:(slow?.78:.7);
- const duration=Math.max(d1,gap+d2);
+ const togetherAt=1.9,duration=slow?togetherAt+1.35:Math.max(d1,gap+d2);
  if(state==='review')scheduleAdvance(Math.max(4600,wait+duration*1000+1000));
  playTimer=setTimeout(()=>{
   playTimer=null;
@@ -201,7 +201,8 @@ function play(slow=false){
    const t=ctx.currentTime+.035;
    // Match the other exercises' per-note level when two notes sound together.
    const volume=harmonic?1.15/2:1.15;
-   note(round.first,t,d1,volume);note(round.second,t+gap,d2,volume);
+    note(round.first,t,d1,volume);note(round.second,t+gap,d2,volume);
+    if(slow){note(round.first,t+togetherAt,1.35,1.15/2);note(round.second,t+togetherAt,1.35,1.15/2)}
    busyUntil=performance.now()+35+duration*1000;
    $('orb').classList.add('playing');
    endTimer=setTimeout(()=>{endTimer=null;$('orb').classList.remove('playing');refreshControls()},35+duration*1000);
@@ -217,6 +218,17 @@ function updateExplanation(){
  if(!$('unpack').checked){$('explanation').textContent='';return}
  $('explanation').textContent='Расстояние между звуками — '+round.distance+' полутонов. '+(intervalType==='harmonic'?'Звуки звучат одновременно.':'Второй звук '+(round.dir>0?'выше':'ниже')+' первого.')+' Нажмите на круговую стрелку, чтобы услышать их ещё раз.';
 }
+function burstConfetti(){
+ if(matchMedia('(prefers-reduced-motion: reduce)').matches)return;
+ const card=$('card'),a=card.getBoundingClientRect(),b=$('orb').getBoundingClientRect();
+ for(let i=0;i<28;i++){
+  const p=document.createElement('i'),angle=i*Math.PI/14,r=85+Math.random()*125;
+  p.setAttribute('aria-hidden','true');
+  p.style.cssText=`position:absolute;pointer-events:none;z-index:2;left:${b.left-a.left+b.width/2}px;top:${b.top-a.top+b.height/2}px;width:6px;height:10px;border-radius:2px;background:${['#b9f7ce','#f8d36c','#f4a0b5','#95c6ff','#ddd1ff'][i%5]}`;
+  card.append(p);
+  p.animate([{transform:'translate(0,0)',opacity:1},{transform:`translate(${Math.cos(angle)*r}px,${Math.sin(angle)*r+27}px) rotate(${i*33}deg)`,opacity:0}],{duration:650,easing:'cubic-bezier(.2,.72,.28,1)'}).onfinish=()=>p.remove();
+ }
+}
 function answer(distance){
  if(state!=='question'||loading||playTimer!==null||endTimer!==null)return;
  state='review';played++;const ok=distance===round.distance;
@@ -228,7 +240,7 @@ function answer(distance){
  $('card').classList.add(ok?'good':'bad');$('feedbackIcon').textContent=ok?'✓':'×';
  updateExplanation();
  $('repeatLabel').textContent='Повторить объяснение';setStatus(ok?'Интервал определён':'Разберём интервал','Следующее задание начнётся автоматически.');
- if(ok){$('prompt').classList.remove('celebrate');void $('prompt').offsetWidth;$('prompt').classList.add('celebrate')}
+  if(ok)burstConfetti();
  feedbackSound(ok);
  if(!ok&&$('unpack').checked)play(true);
  else {

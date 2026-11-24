@@ -6,7 +6,7 @@
 'use strict';
 const results=[],assert=(ok,message)=>{if(!ok)throw Error(message);},near=(a,b,epsilon=1e-7)=>Math.abs(a-b)<epsilon;
 async function test(name,fn){try{await fn();results.push({name,ok:true});}catch(error){results.push({name,ok:false,error:error.message});}}
-const until=async fn=>{const limit=performance.now()+6000;while(!await fn()){if(performance.now()>limit)throw Error('Истекло время ожидания');await new Promise(r=>setTimeout(r,20));}};
+const until=async(fn,description='')=>{const limit=performance.now()+6000;while(!await fn()){if(performance.now()>limit)throw Error('Истекло время ожидания'+(description?': '+(typeof description==='function'?description():description):''));await new Promise(r=>setTimeout(r,20));}};
 function pianoFrame(out,rate,midi,age,previous=.08,detune=0){
  const f=440*2**((midi-69)/12)*2**(detune/1200),partials=[.64,.85,.46,.36,.20].map((volume,i)=>[volume,2*Math.PI*f*(i+1)*Math.sqrt(1+.0002*(i+1)**2)]);
  let seed=179;
@@ -26,20 +26,34 @@ try{
  const [html,store]=await Promise.all(['../note-shooter.html','../progress-store.js'].map(async url=>(await fetch(url,{cache:'no-store'})).text()));
  const isolated=store.replace("DB_NAME = 'solfege-ear-trainers-progress'","DB_NAME = "+JSON.stringify(db));
  const mock=`
- window.mock={midi:60,level:0,now:0,next:0,callbacks:new Map(),values:new Map(),stopped:0,connected:0,deny:true,outputAttempts:0,defer:false};
+ window.mock={midi:60,level:0,now:0,next:0,callbacks:new Map(),values:new Map(),stopped:0,connected:0,deny:true,outputAttempts:0,defer:false,contexts:0,micRequests:0};
+ Object.defineProperty(navigator,'requestMIDIAccess',{value:undefined,writable:true,configurable:true});
+ mock.installMIDI=()=>{
+  mock.inputs=new Map();mock.access={inputs:mock.inputs,onstatechange:null};
+  mock.port=id=>{
+   const port={id,state:'connected',onmidimessage:null,send(data){this.onmidimessage?.({data:new Uint8Array(data)});}};
+   mock.inputs.set(id,port);mock.access.onstatechange?.({port});return port;
+  };
+  mock.disconnect=port=>{port.state='disconnected';mock.access.onstatechange?.({port});};
+  navigator.requestMIDIAccess=options=>{
+   mock.midiOptions=options;mock.midiRequests=(mock.midiRequests||0)+1;
+   if(mock.midiDeny)return Promise.reject(Object.assign(Error(),{name:'NotAllowedError'}));
+   return mock.midiDefer?new Promise(resolve=>mock.resolveMIDI=()=>resolve(mock.access)):Promise.resolve(mock.access);
+  };
+ };
  Object.defineProperty(window,'localStorage',{value:{getItem:key=>mock.values.get(key)??null,setItem:(key,value)=>mock.values.set(key,String(value))}});
  Math.random=()=>0;
  window.requestAnimationFrame=fn=>{const id=++mock.next;mock.callbacks.set(id,fn);return id;};
  window.cancelAnimationFrame=id=>mock.callbacks.delete(id);
  mock.step=(ms=20)=>{mock.now+=ms;const callbacks=[...mock.callbacks.values()];mock.callbacks.clear();callbacks.forEach(fn=>fn(mock.now));};
  Object.defineProperty(navigator,'mediaDevices',{value:{getUserMedia(options){
-  mock.options=options;if(mock.deny)return Promise.reject(Object.assign(Error(),{name:'NotAllowedError'}));
+   mock.micRequests++;mock.options=options;if(mock.deny)return Promise.reject(Object.assign(Error(),{name:'NotAllowedError'}));
   const track={onended:null,onmute:null,stop(){mock.stopped++}};mock.track=track;
   const stream={getTracks:()=>[track],getAudioTracks:()=>[track]};
   return mock.defer?new Promise(resolve=>mock.resolve=()=>resolve(stream)):Promise.resolve(stream);
  }}});
  window.AudioContext=class{
-  constructor(){this.sampleRate=48000;this.state='running';}
+   constructor(){mock.contexts++;this.sampleRate=48000;this.state='running';}
   get destination(){mock.outputAttempts++;throw Error('Игра подключила звуковой выход');}
   resume(){mock.resumed=true;return Promise.resolve();}
   close(){this.state='closed';return Promise.resolve();}
@@ -81,10 +95,10 @@ try{
   assert(!frame(79)&&!frame(79,.60)&&!frame(79,.60)&&!frame(79)&&!frame(79),'Склеились раздельные звуки');
  });
   await test('Конфиг диапазонов, только натуральные, без повторов',()=>{
-  const expected={treble:{basic:[60,71],extended:[59,83]},bass:{basic:[43,57],extended:[40,60]}};
-  assert(JSON.stringify(C.lives)===JSON.stringify({basic:3,extended:5}),'Жизни по диапазону');
+   const expected={treble:{basic:[60,71],extended:[59,83],high:[74,83]},bass:{basic:[43,57],extended:[40,60],high:[53,60]}};
+   assert(JSON.stringify(C.lives)===JSON.stringify({basic:3,extended:5,high:5}),'Жизни по диапазону');
   assert(JSON.stringify(C.ranges)===JSON.stringify(expected),'Границы диапазонов');
-  for(const clef of ['treble','bass'])for(const range of ['basic','extended']){
+   for(const clef of ['treble','bass'])for(const range of ['basic','extended','high']){
    const [low,high]=C.ranges[clef][range];let previous=null;
    const g=create({clef,range},{random:()=>previous===null?0:.999});
    for(let i=0;i<40;i++){
@@ -95,7 +109,7 @@ try{
    }
   });
   await test('Оба ключа: общий адаптивный выбор, без повторов и удвоения нот',()=>{
-   for(const range of ['basic','extended']){
+    for(const range of ['basic','extended','high']){
     let seed=33;const random=()=>{seed=(1664525*seed+1013904223)>>>0;return seed/2**32;};
     const g=create({clef:'both',range},{random,rates:{60:.4,71:.8}}),seen=new Set();
     const pool=S.notePool(g.settings);
@@ -104,7 +118,7 @@ try{
     for(let i=0;i<75;i++){
      const n=g.target(),[low,high]=C.ranges[n.clef][range];seen.add(n.clef);
      assert(n.midi!==previous&&n.midi>=low&&n.midi<=high,'Повтор или неверный диапазон');
-     assert(n.clef===(n.midi>=60?'treble':'bass'),'Неверный стан');
+     assert(n.clef===(n.midi>=(range==='high'?74:60)?'treble':'bass'),'Неверный стан');
      previous=n.midi;const before=g.rates[n.midi]||0;
      if(i===0){
       g.answer(n.midi+1);
@@ -190,7 +204,7 @@ try{
  });
  await test('Не больше одной добавочной линейки; скрипичный диапазон от си до си',()=>{
   assert(S.noteSteps(59,'treble')===-3&&S.noteSteps(83,'treble')===11,'Си должна быть сразу за добавочной линейкой');
-  for(const clef of ['treble','bass'])for(const range of ['basic','extended']){
+   for(const clef of ['treble','bass'])for(const range of ['basic','extended','high']){
    const [low,high]=C.ranges[clef][range];
    for(const midi of [low,high]){
     const steps=S.noteSteps(midi,clef),ledger=steps<0?Math.floor(-steps/2):steps>8?Math.floor((steps-8)/2):0;
@@ -352,7 +366,7 @@ try{
    m.level=0;m.step(3000);$('pause').click();
    for(const [width,height]of [[768,1024],[820,1180],[432,934],[393,852],[365,681]]){
     frame.style.width=width+'px';frame.style.height=height+'px';
-    await until(()=>$('staff').viewBox.baseVal.width===$('stage').clientWidth);
+    await until(()=>$('staff').viewBox.baseVal.width===$('stage').clientWidth,()=>`вёрстка ${width}: SVG ${$('staff').viewBox.baseVal.width}, сцена ${$('stage').clientWidth}, вкладка ${d.hidden?'скрыта':'активна'}`);
     const stage=$('stage').getBoundingClientRect(),top=d.querySelector('[data-clef="treble"] .staff-lines').getBoundingClientRect(),bottom=d.querySelector('[data-clef="bass"] .staff-lines').getBoundingClientRect();
     assert(top.bottom<bottom.top&&bottom.bottom<stage.bottom,'Станы не помещаются');
     for(const head of d.querySelectorAll('.note ellipse')){
@@ -407,7 +421,132 @@ try{
    assert(rows[rows.length-1].mode.direction.includes('80'),'Прогресс новой игры записал темп волны');
    $('pause').click();
   });
-}catch(error){results.push({name:'Запуск стенда',ok:false,error:error.message});}
+   await test('Верхний регистр: ре/фа на второй линейке сверху, свой прогресс и восстановление настройки',async()=>{
+    assert(S.noteSteps(74,'treble')===6&&S.noteSteps(53,'bass')===6,'Неверная стартовая линейка');
+    assert(JSON.stringify(S.notePool({clef:'treble',range:'high'}))==='[74,76,77,79,81,83]','Верхние скрипичные ноты');
+    assert(JSON.stringify(S.notePool({clef:'bass',range:'high'}))==='[53,55,57,59,60]','Верхние басовые ноты');
+    $('finish').click();$('range').value='high';$('clef').value='both';$('bpm').value='80';
+    for(const id of ['range','clef','bpm'])$(id).dispatchEvent(new w.Event('change'));
+    assert($('rangeHint').textContent.includes('ре (5) — си (5)')&&$('rangeHint').textContent.includes('фа (3) — до (4)'),'Подсказка верхнего регистра');
+    w.Math.random=()=>0;m.level=0;m.fill=null;m.values.delete('solfege-note-shooter-rates:both:high');
+    const connections=m.connected,before=(await w.SolfegeProgress.store.list()).length;
+    $('start').click();await until(()=>m.connected===connections+1);m.step(0);m.step(1550);
+    assert($('hearts').getAttribute('aria-label')==='Жизни: 5','Жизни верхнего регистра');
+    m.midi=53;m.level=.2;for(let i=0;i<4;i++)m.step();
+    await until(async()=>(await w.SolfegeProgress.store.list()).length===before+1);
+    const rows=await w.SolfegeProgress.store.list();
+    assert(rows[rows.length-1].correct&&rows[rows.length-1].mode.direction.includes('Верхний регистр'),'Прогресс верхнего регистра');
+    assert(m.values.has('solfege-note-shooter-rates:both:high'),'Нет отдельных адаптивных весов');
+    $('pause').click();$('finish').click();
+    const reopened=document.createElement('iframe'),ready=new Promise(resolve=>reopened.onload=resolve);
+    reopened.srcdoc=html.replace('<head>','<head><base href="'+new URL('../',location.href).href+'">').replace('<script src="./progress-store.js"><'+'/script>','<script>'+isolated+'<'+'/script><script>'+mock+'mock.values=new Map('+JSON.stringify([...m.values])+');<'+'/script>');
+    document.body.append(reopened);await ready;
+    try{assert(reopened.contentDocument.getElementById('range').value==='high','Верхний регистр не сохраняется');}
+    finally{await reopened.contentWindow.SolfegeProgress.store.close();reopened.remove();}
+    m.level=0;
+   });
+   const midiSettle=()=>new Promise(resolve=>w.setTimeout(resolve,70));
+   const midiSettings=()=>{
+    if($('screenTitle').textContent==='Пауза')$('finish').click();
+    $('inputSource').value='auto';$('clef').value='treble';$('range').value='basic';$('bpm').value='80';
+    for(const id of ['inputSource','clef','range','bpm'])$(id).dispatchEvent(new w.Event('change'));
+    w.Math.random=()=>0;m.values.delete('solfege-note-shooter-rates:treble:basic');m.level=0;m.fill=null;
+   };
+   await test('MIDI: note-on, каналы, note-off/velocity 0, удержание и отсутствие аудиовыхода',async()=>{
+    midiSettings();m.installMIDI();const port=m.port('piano');
+    const contexts=m.contexts,mics=m.micRequests;
+    $('start').click();await until(()=>$('screen').hidden);m.step(0);
+    assert(m.midiOptions.sysex===false&&m.contexts===contexts&&m.micRequests===mics,'MIDI запросил микрофон или AudioContext');
+    port.send([0x90,60,100]);await until(()=>$('answers').textContent==='1');
+    assert($('accuracy').textContent==='100%'&&$('heard').textContent.includes('MIDI'),'Нота не засчитана');
+    port.send([0x90,60,100]);port.send([0x80,60,20]);await midiSettle();
+    assert($('answers').textContent==='1','Удержание/note-off стало ответом');
+    m.step(1500);port.send([0x92,62,110]);await until(()=>$('answers').textContent==='2');
+    port.send([0x92,62,0]);await midiSettle();
+    assert($('accuracy').textContent==='100%'&&m.outputAttempts===0,'Канал MIDI или velocity 0 обработан неверно');
+    $('pause').click();$('finish').click();
+   });
+   await test('MIDI: аккорд — одна ошибка, включая несколько портов и освобождение клавиш',async()=>{
+    midiSettings();const a=m.inputs.get('piano'),b=m.port('second');
+    $('start').click();await until(()=>$('screen').hidden);m.step(0);
+    a.send([0x90,60,100]);b.send([0x91,64,100]);a.send([0x90,67,100]);
+    await until(()=>$('answers').textContent==='1');
+    assert($('accuracy').textContent==='0%'&&$('hint').textContent.includes('по одной ноте'),'Аккорд засчитан как попадание');
+    m.step(650);assert($('hearts').getAttribute('aria-label')==='Жизни: 2','Аккорд снял не одну жизнь');
+    a.send([0x90,60,100]);b.send([0x91,65,100]);await midiSettle();
+    assert($('answers').textContent==='1','Удерживаемый аккорд дал ещё один ответ');
+    for(const pitch of [60,67])a.send([0x80,pitch,0]);
+    for(const pitch of [64,65])b.send([0x81,pitch,0]);
+    m.step(900);a.send([0x90,62,100]);await until(()=>$('answers').textContent==='2');
+    assert($('accuracy').textContent==='50%','После отпускания клавиш нет нового ответа');
+    a.send([0x90,62,0]);$('pause').click();$('finish').click();
+   });
+   await test('MIDI: пауза/конец/скрытие и отмена ожидающего ответа',async()=>{
+    midiSettings();const p=m.inputs.get('piano');
+    $('start').click();await until(()=>$('screen').hidden);m.step(0);
+    p.send([0x90,60,100]);$('pause').click();await midiSettle();
+    assert($('answers').textContent==='0','Отложенный ответ прошёл на паузе');
+    $('start').click();await until(()=>$('screen').hidden);m.step(0);
+    p.send([0x90,60,100]);await midiSettle();
+    assert($('answers').textContent==='0','Удержание после паузы засчитано');
+    p.send([0x80,60,0]);p.send([0x90,60,100]);await until(()=>$('answers').textContent==='1');
+    p.send([0x80,60,0]);
+    Object.defineProperty(d,'hidden',{value:true,configurable:true});d.dispatchEvent(new w.Event('visibilitychange'));
+    p.send([0x90,62,100]);await midiSettle();
+    assert($('screenTitle').textContent==='Пауза'&&$('answers').textContent==='1','Скрытая страница принимает MIDI');
+    Object.defineProperty(d,'hidden',{value:false,configurable:true});p.send([0x80,62,0]);
+    $('finish').click();p.send([0x90,60,100]);await midiSettle();
+    assert($('answers').textContent==='1'&&!m.callbacks.size,'После конца есть MIDI-ответы');
+    p.send([0x80,60,0]);
+   });
+   await test('MIDI: hotplug, оставшийся порт, возврат к микрофону и явный выбор микрофона',async()=>{
+    midiSettings();const a=m.inputs.get('piano'),b=m.inputs.get('second');
+    $('start').click();await until(()=>$('screen').hidden);
+    m.disconnect(a);assert($('screen').hidden,'Отключение одного из двух портов остановило игру');
+    m.disconnect(b);assert($('screenTitle').textContent==='Пауза','Последний MIDI-порт отключён без паузы');
+    const connections=m.connected;$('start').click();await until(()=>m.connected===connections+1);
+    const stopped=m.stopped;m.port('hotplug');
+    assert(m.stopped===stopped+1&&$('screen').hidden&&$('heard').textContent==='MIDI: —','Авто не переключилось с микрофона на MIDI');
+    $('pause').click();$('finish').click();
+    $('inputSource').value='microphone';$('inputSource').dispatchEvent(new w.Event('change'));
+    $('start').click();await until(()=>m.connected===connections+2);
+    const p=m.inputs.get('hotplug');p.send([0x90,60,100]);await midiSettle();
+    assert($('answers').textContent==='0','MIDI отвечает при выбранном микрофоне');
+    p.send([0x80,60,0]);$('pause').click();$('finish').click();
+   });
+   await test('MIDI: победа сохраняет выбранный темп, удержание во время заставки не отвечает, источник восстанавливается',async()=>{
+    midiSettings();const p=m.inputs.get('hotplug');
+    $('start').click();await until(()=>$('screen').hidden);m.step(0);
+    for(let i=0;i<50;i++){
+     m.step(1500);const pitch=i%2?62:60;
+     p.send([0x90,pitch,100]);await until(()=>$('answers').textContent===String(i+1));p.send([0x80,pitch,0]);
+    }
+    assert(!$('victory').hidden,'MIDI не запускает победу');
+    p.send([0x90,60,100]);await until(()=>$('victory').hidden);
+    assert($('bpm').value==='80'&&$('tempo').textContent==='♩=90'&&JSON.parse(m.values.get('solfege-note-shooter-settings')).bpm===80,'MIDI изменил настройку темпа волной');
+    p.send([0x90,60,100]);await midiSettle();assert($('answers').textContent==='50','Удержание на заставке стало ответом');
+    p.send([0x80,60,0]);$('pause').click();$('finish').click();
+    $('inputSource').value='midi';$('inputSource').dispatchEvent(new w.Event('change'));
+    const reopened=document.createElement('iframe'),ready=new Promise(resolve=>reopened.onload=resolve);
+    reopened.srcdoc=html.replace('<head>','<head><base href="'+new URL('../',location.href).href+'">').replace('<script src="./progress-store.js"><'+'/script>','<script>'+isolated+'<'+'/script><script>'+mock+'mock.values=new Map('+JSON.stringify([...m.values])+');<'+'/script>');
+    document.body.append(reopened);await ready;
+    try{assert(reopened.contentDocument.getElementById('inputSource').value==='midi','Источник ввода не восстановился');}
+    finally{await reopened.contentWindow.SolfegeProgress.store.close();reopened.remove();}
+   });
+   await test('MIDI: отказ и отсутствие API молча используют микрофон; позднее разрешение отменено',async()=>{
+    midiSettings();$('inputSource').value='midi';$('inputSource').dispatchEvent(new w.Event('change'));
+    m.midiDeny=true;let connections=m.connected;
+    $('start').click();await until(()=>m.connected===connections+1);
+    assert(!$('error').textContent,'Отказ MIDI показал ошибку вместо микрофона');
+    $('pause').click();$('finish').click();m.midiDeny=false;
+    m.midiDefer=true;$('start').click();$('finish').click();m.resolveMIDI();await midiSettle();
+    assert($('screenTitle').textContent==='Игра окончена'&&!m.callbacks.size,'Позднее разрешение MIDI запустило игру');
+    m.midiDefer=false;w.navigator.requestMIDIAccess=undefined;connections=m.connected;
+    $('start').click();await until(()=>m.connected===connections+1);
+    assert(!$('error').textContent,'Нет API: не запустился микрофон');
+    $('pause').click();$('finish').click();
+   });
+ }catch(error){results.push({name:'Запуск стенда',ok:false,error:error.message});}
 finally{
  if(frame){
   frame.contentWindow.dispatchEvent(new frame.contentWindow.Event('pagehide'));

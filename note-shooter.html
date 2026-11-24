@@ -42,8 +42,9 @@ button,select{font:inherit;min-height:44px;border:1px solid var(--edge);border-r
   <div id="settingsBox">
    <div class="settings">
     <label>Ключ<select id="clef"><option value="treble">Скрипичный</option><option value="bass">Басовый</option><option value="both">Оба ключа</option></select></label>
-    <label>Диапазон<select id="range"><option value="basic">Базовый</option><option value="extended">Расширенный</option></select></label>
+    <label>Диапазон<select id="range"><option value="basic">Базовый</option><option value="extended">Расширенный</option><option value="high">Верхний регистр</option></select></label>
     <label class="wide">Темп, ударов в минуту<select id="bpm"><option>40</option><option>50</option><option>60</option><option>70</option><option selected>80</option><option>90</option><option>100</option><option>110</option><option>120</option><option>130</option><option>140</option><option>150</option><option>160</option></select></label>
+    <label class="wide">Источник ввода<select id="inputSource"><option value="microphone">Микрофон</option><option value="midi">MIDI</option><option value="auto" selected>Авто</option></select></label>
    </div>
    <p class="range-hint" id="rangeHint"></p>
     <p class="small">Играйте по одной ноте без педали. В режиме «Оба ключа» ноты появляются на верхнем или нижнем стане. После ответа отпустите клавишу и дайте звуку затихнуть. Игра не издаёт звуков.</p>
@@ -66,11 +67,11 @@ button,select{font:inherit;min-height:44px;border:1px solid var(--edge);border-r
 // MIDI limits, geometry and beat timing live in this one immutable config.
 const CONFIG = Object.freeze({
  ranges: Object.freeze({
-  treble: Object.freeze({basic:Object.freeze([60,71]),extended:Object.freeze([59,83])}),
-  bass: Object.freeze({basic:Object.freeze([43,57]),extended:Object.freeze([40,60])})
+  treble: Object.freeze({basic:Object.freeze([60,71]),extended:Object.freeze([59,83]),high:Object.freeze([74,83])}),
+  bass: Object.freeze({basic:Object.freeze([43,57]),extended:Object.freeze([40,60]),high:Object.freeze([53,60])})
  }),
  shipX:.12, lineX:.38, spawnX:.95, travelBeats:8, spawnBeats:2,
- doomSeconds:.6, cooldownMs:65, lives:Object.freeze({basic:3,extended:5}), minBpm:40, maxBpm:160, bpmStep:10,
+ doomSeconds:.6, cooldownMs:65, lives:Object.freeze({basic:3,extended:5,high:5}), minBpm:40, maxBpm:160, bpmStep:10,
  victoryNotes:50, adaptive:Object.freeze({bias:4,maxWeight:5,decay:.85,errorBoost:.35})
 });
 const natural=[0,2,4,5,7,9,11], syllables=['до','ре','ми','фа','соль','ля','си'];
@@ -95,9 +96,9 @@ function notePool(settings) {
  }
  return [...pool].sort((a,b)=>a-b);
 }
-// Middle C and higher belong to the upper staff. Deduplicate the overlapping
-// ranges so a pitch keeps its adaptive weight instead of getting two tickets.
-function staffFor(midi,clef) { return clef==='both'?(midi>=60?'treble':'bass'):clef; }
+// In the upper register middle C remains on bass; the treble pool starts at D5.
+// Deduplicate overlapping ranges so a pitch does not get two adaptive tickets.
+function staffFor(midi,clef,range) { return clef==='both'?(midi>=(range==='high'?74:60)?'treble':'bass'):clef; }
 // Weighted draw: a note above the pool's average error rate becomes more
 // likely, up to a cap. The previous note is always excluded.
 function weightedPick(pool, previous, rates, random = Math.random) {
@@ -125,7 +126,7 @@ function createGame(settings, {random=Math.random,onVerdict=()=>{},onCollision=(
  let previous=null, serial=0;
  function spawn(){
   const midi=weightedPick(pool,previous,game.rates,random);previous=midi;
-  game.notes.push({id:++serial,midi,clef:staffFor(midi,settings.clef),x:CONFIG.spawnX,speed:(CONFIG.spawnX-CONFIG.lineX)/(CONFIG.travelBeats*game.beat),state:'moving',age:0,doomAge:0});
+  game.notes.push({id:++serial,midi,clef:staffFor(midi,settings.clef,settings.range),x:CONFIG.spawnX,speed:(CONFIG.spawnX-CONFIG.lineX)/(CONFIG.travelBeats*game.beat),state:'moving',age:0,doomAge:0});
  }
  game.target=()=>game.notes.filter(n=>n.state==='moving').reduce((left,n)=>!left||n.x<left.x?n:left,null);
  function resolve(note,outcome,actual=null){
@@ -192,6 +193,7 @@ window.NoteShooter=Object.freeze({CONFIG,createGame,noteName,noteSteps,weightedP
 const $=id=>document.getElementById(id), P=window.PitchDetector, progress=window.SolfegeProgress.tracker('note-shooter');
 const intro=$('screenText').textContent;
 const settingsKey='solfege-note-shooter-settings';
+const rangeLabels={basic:'Базовый',extended:'Расширенный',high:'Верхний регистр'};
 // Records and error rates belong to a mode: a streak at 40 BPM is not a streak
 // at 160, and mistakes in extended bass must not weight basic treble notes.
 // Records use the tempo the player chose; wave raises live only inside a game.
@@ -201,10 +203,11 @@ let allTimeBest=0;
 try{
  const saved=JSON.parse(localStorage.getItem(settingsKey)||'{}');
  if(['treble','bass','both'].includes(saved.clef))$('clef').value=saved.clef;
- if(['basic','extended'].includes(saved.range))$('range').value=saved.range;
- if(Number.isInteger(saved.bpm)&&saved.bpm>=CONFIG.minBpm&&saved.bpm<=CONFIG.maxBpm&&saved.bpm%CONFIG.bpmStep===0)$('bpm').value=saved.bpm;
+ if(['basic','extended','high'].includes(saved.range))$('range').value=saved.range;
+  if(Number.isInteger(saved.bpm)&&saved.bpm>=CONFIG.minBpm&&saved.bpm<=CONFIG.maxBpm&&saved.bpm%CONFIG.bpmStep===0)$('bpm').value=saved.bpm;
+  if(['microphone','midi','auto'].includes(saved.inputSource))$('inputSource').value=saved.inputSource;
 }catch{}
-const readSettings=()=>({clef:$('clef').value,range:$('range').value,bpm:+$('bpm').value});
+const readSettings=()=>({clef:$('clef').value,range:$('range').value,bpm:+$('bpm').value,inputSource:$('inputSource').value});
 function saveSettings(){try{localStorage.setItem(settingsKey,JSON.stringify(readSettings()));}catch{}}
 function loadBest(){
  allTimeBest=0;
@@ -222,17 +225,78 @@ function saveRates(){try{localStorage.setItem(ratesKeyFor(game.settings),JSON.st
 function rangeHint(){
  const s=readSettings(),pool=notePool(s),keys=s.clef==='both'?['treble','bass']:[s.clef];
  const ranges=keys.map(clef=>{
-  const notes=pool.filter(n=>staffFor(n,s.clef)===clef);
+  const notes=pool.filter(n=>staffFor(n,s.clef,s.range)===clef);
   return (s.clef==='both'?(clef==='treble'?'Скрипичный: ':'Басовый: '):'')+noteName(notes[0])+' — '+noteName(notes[notes.length-1]);
  }).join(' · ');
  $('rangeHint').textContent=`${ranges}. До линии: ${(8*60/s.bpm).toFixed(1).replace('.',',')} с. Новая нота каждые ${(2*60/s.bpm).toFixed(2).replace('.',',')} с.`;
 }
-for(const id of ['clef','range','bpm'])$(id).addEventListener('change',()=>{
+for(const id of ['clef','range','bpm','inputSource'])$(id).addEventListener('change',()=>{
  saveSettings();rangeHint();loadBest();stats();
  if(view==='over')$('result').textContent=resultText();
  if(!game){layout();render();}
 });
 let game=null,view='start',frame=0,lastFrame=null,generation=0,context=null,stream=null,source=null,analyser=null;
+let midiAccess=null,midiEnabled=false,activeInput='microphone',midiTimer=null,midiGesture=null;
+const midiPorts=new Map(),midiHeld=new Set();
+// Briefly collect note-ons before answering: a chord must not first score a hit.
+const midiChordMs=40;
+function cancelMidiAnswer(){
+ if(midiTimer!==null){clearTimeout(midiTimer);midiTimer=null;}
+ midiGesture=null;
+}
+function midiMessage(port,event){
+ if(midiPorts.get(port.id)!==port)return;
+ const data=event.data;
+ if(!data||data.length<3)return;
+ const [status,pitch,velocity]=data,command=status&0xf0,channel=status&15;
+ if(pitch>127||velocity>127)return;
+ const prefix=JSON.stringify(port.id)+':',key=prefix+channel+':'+pitch;
+ if(command===0xb0&&(pitch===120||pitch===123)){
+  for(const held of midiHeld)if(held.startsWith(prefix+channel+':'))midiHeld.delete(held);
+  return;
+ }
+ if(command===0x80||(command===0x90&&velocity===0)){midiHeld.delete(key);return;}
+ if(command!==0x90||midiHeld.has(key))return;
+ const previous=midiHeld.size;midiHeld.add(key);
+ if(view!=='playing'||activeInput!=='midi'||document.hidden)return;
+ if(midiGesture){
+  if(previous)midiGesture.chord=true;return;
+ }
+ // Held keys (including keys pressed during pause/victory) must be released first.
+ if(previous)return;
+ const target=game.target();if(!target)return;
+ const gesture=midiGesture={pitch,target:target.id,chord:false};
+ midiTimer=setTimeout(()=>{
+  midiTimer=null;midiGesture=null;
+  if(view!=='playing'||activeInput!=='midi'||document.hidden||game.target()?.id!==gesture.target)return;
+  $('heard').textContent='MIDI: '+noteName(gesture.pitch);
+  // Infinite detuning forces one ordinary wrong verdict without changing the core.
+  const verdict=game.answer(gesture.pitch,gesture.chord?Infinity:0);
+  if(verdict&&gesture.chord)$('hint').textContent='Играйте по одной ноте. Правильно: '+answerName(verdict.note.midi)+'.';
+  render();
+ },midiChordMs);
+}
+function preferMidi(){return midiEnabled&&$('inputSource').value!=='microphone'&&midiPorts.size>0;}
+function syncMidiPorts(){
+ if(!midiAccess)return;
+ const connected=new Map();
+ for(const port of midiAccess.inputs.values())if(port.state!=='disconnected')connected.set(port.id,port);
+ for(const [id,port]of midiPorts)if(connected.get(id)!==port){
+  port.onmidimessage=null;midiPorts.delete(id);
+  for(const key of midiHeld)if(key.startsWith(JSON.stringify(id)+':'))midiHeld.delete(key);
+  cancelMidiAnswer();
+ }
+ for(const [id,port]of connected)if(!midiPorts.has(id)){
+  midiPorts.set(id,port);port.onmidimessage=event=>midiMessage(port,event);
+ }
+ if(view!=='playing')return;
+ if(preferMidi()&&activeInput!=='midi'){
+  stopMicrophone();cancelMidiAnswer();activeInput='midi';
+  $('heard').textContent='MIDI: —';$('hint').textContent='MIDI подключён. Играйте по одной ноте.';
+ }else if(!preferMidi()&&activeInput==='midi'){
+  pauseGame('MIDI отключён. Подключите инструмент или нажмите «Продолжить», чтобы использовать микрофон.');
+ }
+}
 const pitchProfile=Object.freeze({minClarity:.88,window:6,minHits:2});
 let buffer,recent,detect,stable=P.vote(pitchProfile),attack=P.onset(),noise=P.noiseFloor({minThreshold:.0022,multiplier:2.5}),muteUntil=0,lastLevel=0;
 let confirmed=null,confirmedUntil=0,targetHits=0;
@@ -282,7 +346,7 @@ function blockMic(){
 }
 function onVerdict(event){
  const {note,outcome,actual}=event;
- progress.record({correct:outcome==='correct',task:note.midi+':'+outcome,mode:{clef:game.settings.clef,direction:(game.settings.range==='basic'?'Базовый':'Расширенный')+' · '+game.bpm+' уд/мин'},expected:noteName(note.midi),actual:outcome==='timeout'?'Пропуск (нота не сыграна)':noteName(actual)});
+  progress.record({correct:outcome==='correct',task:note.midi+':'+outcome,mode:{clef:game.settings.clef,direction:rangeLabels[game.settings.range]+' · '+game.bpm+' уд/мин'},expected:noteName(note.midi),actual:outcome==='timeout'?'Пропуск (нота не сыграна)':noteName(actual)});
  saveBest();saveRates();stats();blockMic();
  fx.push({id:note.id,at:event.at,type:outcome,x:note.x,midi:note.midi,clef:note.clef});
  const correctName=outcome==='correct'?'':answerName(note.midi);
@@ -299,19 +363,22 @@ function showScreen(type,message=''){
  $('finish').hidden=!['paused','loading'].includes(type);$('result').hidden=type!=='over';$('pause').disabled=type!=='playing';
  $('start').disabled=type==='loading';$('error').textContent=message;
  $('stage').classList.toggle('frozen',type==='paused');
- $('screenTitle').textContent={start:'Нотная аркада',loading:'Подключаем микрофон',paused:'Пауза',over:'Игра окончена'}[type]||'';
- $('screenText').textContent={start:intro,loading:'Разрешите микрофон. Ноты начнут двигаться только после подключения.',paused:'Ноты и время остановлены. Для продолжения нажмите «Продолжить» и сыграйте с нового нажатия.',over:'Настройте следующую игру или попробуйте ещё раз.'}[type]||'';
+  $('screenTitle').textContent={start:'Нотная аркада',loading:'Подключаем ввод',paused:'Пауза',over:'Игра окончена'}[type]||'';
+  $('screenText').textContent={start:intro,loading:'Разрешите доступ к инструменту или микрофону. Ноты начнут двигаться только после подключения.',paused:'Ноты и время остановлены. Для продолжения нажмите «Продолжить» и сыграйте с нового нажатия.',over:'Настройте следующую игру или попробуйте ещё раз.'}[type]||'';
  $('start').textContent=type==='paused'?'Продолжить':type==='over'?'Ещё раз':'Старт';
  if(type==='over')$('result').textContent=resultText();
  updateTempo();
 }
-function releaseAudio(){
- generation++;cancelAnimationFrame(frame);frame=0;lastFrame=null;clearVictory();
+function stopMicrophone(){
  if(stream){for(const t of stream.getTracks()){t.onended=null;t.onmute=null;t.stop();}stream=null;}
  if(source){source.disconnect();source=null;}if(analyser){analyser.disconnect();analyser=null;}
  if(context){const old=context;context=null;old.onstatechange=null;old.close().catch(()=>{});}
  confirmed=null;confirmedUntil=0;
  $('heard').textContent='Слышу: —';$('level').style.width='0';$('meter').setAttribute('aria-valuenow','0');
+}
+function releaseAudio(){
+ generation++;cancelAnimationFrame(frame);frame=0;lastFrame=null;clearVictory();cancelMidiAnswer();
+ stopMicrophone();
 }
 function pauseGame(message=''){
  if(!game||view==='over'||view==='start')return;
@@ -322,7 +389,7 @@ function endGame(){
 }
 function clearVictory(){if(victoryTimer!==null){clearTimeout(victoryTimer);victoryTimer=null;}$('victory').hidden=true;}
 function celebrate(noteText){
- game.pause();view='victory';stable.reset();targetHits=0;cancelAnimationFrame(frame);frame=0;
+  game.pause();view='victory';cancelMidiAnswer();stable.reset();targetHits=0;cancelAnimationFrame(frame);frame=0;
  const stars=$('victoryStars');stars.replaceChildren();
  if(!reducedMotion.matches)for(let i=0;i<24;i++){
   const star=document.createElement('i'),colors=['#2a6bd4','#b32949','#e59b12','#129c9c'];
@@ -363,10 +430,27 @@ async function start(){
  if(view==='loading'||view==='playing')return;
  const resuming=view==='paused';
  if(!resuming)newGame();
- if(!window.isSecureContext){showScreen('paused','Микрофону нужен HTTPS. На компьютере работает localhost, но не обычный HTTP по адресу локальной сети.');return;}
- if(!navigator.mediaDevices?.getUserMedia){showScreen('paused','Браузер не поддерживает микрофон. Откройте страницу в Safari или Chrome.');return;}
- showScreen('loading');const token=++generation;
- try{
+  showScreen('loading');const token=++generation;
+  try{
+   midiEnabled=false;
+   if(navigator.requestMIDIAccess){
+    try{
+     const access=await navigator.requestMIDIAccess({sysex:false});
+     if(token!==generation)return;
+     if(midiAccess&&midiAccess!==access)midiAccess.onstatechange=null;
+     midiAccess=access;midiEnabled=true;midiAccess.onstatechange=syncMidiPorts;syncMidiPorts();
+    }catch{/* Unsupported/denied MIDI silently uses the existing microphone path. */}
+    if(token!==generation)return;
+   }
+   if(preferMidi()){
+    if(document.hidden){pauseGame();return;}
+    cancelMidiAnswer();activeInput='midi';game.resume();lastFrame=null;showScreen('playing');
+    $('heard').textContent='MIDI: —';$('hint').textContent='MIDI подключён. Играйте по одной ноте.';
+    frame=requestAnimationFrame(loop);return;
+   }
+   activeInput='microphone';
+   if(!window.isSecureContext){showScreen('paused','Микрофону нужен HTTPS. На компьютере работает localhost, но не обычный HTTP по адресу локальной сети.');return;}
+   if(!navigator.mediaDevices?.getUserMedia){showScreen('paused','Браузер не поддерживает микрофон. Откройте страницу в Safari или Chrome.');return;}
   context=new(window.AudioContext||window.webkitAudioContext)();
   const active=context,resumed=active.resume();resumed.catch(()=>{});
   const pending=navigator.mediaDevices.getUserMedia({audio:{echoCancellation:false,noiseSuppression:false,autoGainControl:false,channelCount:1}});
@@ -374,14 +458,15 @@ async function start(){
   if(token!==generation){acquired.getTracks().forEach(t=>t.stop());return;}
   stream=acquired;await resumed;if(token!==generation)return;
   if(document.hidden){pauseGame();return;}
-  analyser=active.createAnalyser();analyser.fftSize=game.settings.range==='extended'?8192:4096;analyser.smoothingTimeConstant=0;
+   analyser=active.createAnalyser();analyser.fftSize=game.settings.range==='basic'?4096:8192;analyser.smoothingTimeConstant=0;
   buffer=new Float32Array(analyser.fftSize);recent=buffer.subarray(buffer.length-P.pianoWindowSize(buffer,active.sampleRate));
   detect=P.detector({pianoAttack:true});source=active.createMediaStreamSource(stream);source.connect(analyser);
   for(const track of stream.getAudioTracks())track.onended=track.onmute=()=>pauseGame('Микрофон отключён или прерван. Проверьте доступ и нажмите «Продолжить».');
   active.onstatechange=()=>{if(view==='playing'&&active.state!=='running')pauseGame('Звук прерван системой. Нажмите «Продолжить».');};
   stable.reset();
   if(resuming)attack.block(game.time*1000,Math.max(lastLevel,.015),Math.max(0,muteUntil-game.time*1000));
-  game.resume();lastFrame=null;showScreen('playing');$('hint').textContent='Ближайшую ноту справа от линии можно сыграть сразу.';
+   game.resume();lastFrame=null;showScreen('playing');$('hint').textContent='Ближайшую ноту справа от линии можно сыграть сразу.';
+   syncMidiPorts();
   frame=requestAnimationFrame(loop);
  }catch(error){
   if(token===generation)pauseGame(error.name==='NotAllowedError'?'Доступ к микрофону запрещён. Разрешите его в настройках сайта и нажмите «Продолжить».':error.name==='NotFoundError'?'Микрофон не найден. Подключите его и повторите.':'Не удалось запустить микрофон. Закройте другие приложения со звуком и повторите.');
@@ -426,7 +511,7 @@ function loop(now){
   if(view!=='playing')return;
   // Advance deadlines before reading a frame: a late note cannot hit a new
   // target using audio already accepted for the one that timed out.
-  hear();render(dt);if(view!=='playing')return;frame=requestAnimationFrame(loop);
+   if(activeInput==='microphone')hear();render(dt);if(view!=='playing')return;frame=requestAnimationFrame(loop);
  }catch{pauseGame('Микрофон прерван. Нажмите «Продолжить».');}
 }
 function layout(){
