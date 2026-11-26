@@ -228,8 +228,10 @@ function play(slow=false){
    const t=ctx.currentTime+.035;
    // Match the other exercises' per-note level when two notes sound together.
     const volume=harmonic?1.15/2:1.15;
-    note(round.first,t,d1,volume);note(round.second,t+gap,d2,volume);
-    if(slow){note(round.first,t+togetherAt,1.35,1.15/2);note(round.second,t+togetherAt,1.35,1.15/2)}
+    const first=slow?Math.min(round.first,round.second):round.first;
+    const second=slow?Math.max(round.first,round.second):round.second;
+    note(first,t,d1,volume);note(second,t+gap,d2,volume);
+    if(slow){note(first,t+togetherAt,1.35,1.15/2);note(second,t+togetherAt,1.35,1.15/2)}
    busyUntil=performance.now()+35+duration*1000;
    $('orb').classList.add('playing');
    endTimer=setTimeout(()=>{endTimer=null;$('orb').classList.remove('playing');refreshControls()},35+duration*1000);
