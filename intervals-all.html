@@ -46,7 +46,10 @@ body > .credits{width:min(100%,600px);margin:12px auto 0;flex:none}
 .bottom button{border:0;background:none;color:#b2d9c8;text-decoration:underline;cursor:pointer;font-size:12px}
 @media(max-width:530px){.bottom{font-size:11px;gap:8px 10px;flex-shrink:0}.bottom button{font-size:11px}.explanation{flex-shrink:0}.feedback{flex-shrink:0}}
 .mode-row{flex-wrap:wrap;justify-content:center;gap:8px}.mode-btn{min-width:0;min-height:44px;padding:8px 10px}
-</style></head><body><main><section class="card idle" id="card" aria-label="Все интервалы">
+.card:is(.bad,.good) .orb.playing > .replay-control:not(:disabled){visibility:visible}
+.card:is(.bad,.good) .orb.playing .feedback-icon{visibility:hidden}
+.association-name{color:var(--accent)}
+</style><script src="./interval-associations.js"></script></head><body><main><section class="card idle" id="card" aria-label="Все интервалы">
 <div class="headrow"><div><h1>Все интервалы</h1><p class="sub">Определите интервал на слух.</p></div><div class="round-actions"><a class="back-link" href="./index.html">← К упражнениям</a></div></div>
 <div class="audio-area"><div class="orb" id="orb"><button class="soft replay-control" id="repeat" disabled><svg class="replay-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10a9 9 0 1 1 2.7 8.4"/><path d="M3 4v6h6"/></svg><span class="replay-symbol">↻</span><span class="replay-label" id="repeatLabel">Повторить вопрос</span><span class="space-hint">ПРОБЕЛ</span></button><button type="button" id="start" class="orb-start" aria-label="Начать тренировку"><span aria-hidden="true">▶</span><small>НАЧАТЬ</small></button><div class="bars"><span class="bar"></span><span class="bar"></span><span class="bar"></span><span class="bar"></span><span class="bar"></span><span class="bar"></span></div><div class="feedback-icon" id="feedbackIcon"></div></div></div>
 <div class="prompt" aria-live="polite"><strong id="prompt">Слушайте два звука.</strong><small id="hint">Два звука одновременно.</small></div>
@@ -148,7 +151,9 @@ try{
 let ctx=null,limiter=null,timbre='piano',round=null,state='idle',transition=null,played=0,correct=0,streak=0,record=0;
 let busyUntil=-Infinity,playTimer=null,endTimer=null,loading=false,modeRequest=0;
 let beginRequest=0;
+let reviewWrong=false;
 const liveSources=new Set();
+const associations=window.IntervalAssociations,associationPlayer=associations.createPlayer(note);
 const buffers={piano:new Map(),electric:new Map()},loads={piano:null,electric:null};
 try{record=Number(localStorage.getItem(recordKey)||0)||0}catch{}
 $('record').textContent=record;
@@ -190,8 +195,9 @@ function note(midi,start,duration,volume=1.15){
  source.buffer=buffer;source.playbackRate.setValueAtTime(Math.pow(2,(midi-base)/12),start);
  gain.gain.setValueAtTime(.0001,start);gain.gain.linearRampToValueAtTime(volume,start+.006);
  gain.gain.setValueAtTime(volume,start+Math.max(.007,duration-fade));gain.gain.linearRampToValueAtTime(.0001,start+duration);
- source.connect(gain);gain.connect(limiter);source.start(start);source.stop(start+duration+.005);liveSources.add(source);
- source.onended=()=>{liveSources.delete(source);source.disconnect();gain.disconnect()};
+  source.connect(gain);gain.connect(limiter);source.start(start);source.stop(start+duration+.005);liveSources.add(source);
+  source.onended=()=>{liveSources.delete(source);source.disconnect();gain.disconnect()};
+  return source;
 }
 function feedbackSound(ok){
  if(!$('sounds').checked||!ctx)return;
@@ -208,18 +214,29 @@ function feedbackSound(ok){
 }
 function cancelTransition(){if(transition!==null){clearTimeout(transition);transition=null}}
 function clearPlaybackTimers(){if(playTimer!==null){clearTimeout(playTimer);playTimer=null}if(endTimer!==null){clearTimeout(endTimer);endTimer=null}}
+function cancelPlayback(){
+ clearPlaybackTimers();associationPlayer.cancel();
+ for(const source of liveSources){try{source.stop()}catch{}}liveSources.clear();
+ busyUntil=-Infinity;$('orb').classList.remove('playing');
+}
+function associationForRound(){
+ return reviewWrong&&$('unpack').checked&&(intervalType==='harmonic'||round?.dir>0)?associations.get(round.distance):null;
+}
 function refreshControls(){
  const ready=!loading&&playTimer===null&&endTimer===null;
  $('repeat').setAttribute('aria-label',state==='review'?'Повторить объяснение':'Повторить вопрос');
- setButtons(state==='question'&&ready);$('repeat').disabled=!(ready&&(state==='question'||state==='review'));
+ setButtons(state==='question'&&ready);$('repeat').disabled=loading||!(state==='review'||(state==='question'&&ready));
 }
 function scheduleAdvance(delay){cancelTransition();transition=setTimeout(()=>{transition=null;if(state==='review')next()},delay)}
-function play(slow=false){
+function play(slow=false,withErrorSignal=false){
  if(!round||(state!=='question'&&state!=='review'))return;
- clearPlaybackTimers();
+ cancelTransition();cancelPlayback();
+ if(withErrorSignal)feedbackSound(false);
  const harmonic=intervalType==='harmonic'&&!slow;
  const wait=Math.max(0,busyUntil-performance.now()),gap=harmonic?0:(slow?.83:.62),d1=harmonic?1.35:(slow?.67:.53),d2=harmonic?1.35:(slow?.78:.7);
- const togetherAt=1.9,duration=slow?togetherAt+1.35:Math.max(d1,gap+d2);
+ const association=slow?associationForRound():null;
+ const intervalAt=association?associations.duration(round.distance)+.35:0,togetherAt=intervalAt+1.9;
+ const duration=slow?togetherAt+1.35:Math.max(d1,gap+d2);
  if(state==='review')scheduleAdvance(Math.max(4600,wait+duration*1000+1000));
  playTimer=setTimeout(()=>{
   playTimer=null;
@@ -230,20 +247,26 @@ function play(slow=false){
     const volume=harmonic?1.15/2:1.15;
     const first=slow?Math.min(round.first,round.second):round.first;
     const second=slow?Math.max(round.first,round.second):round.second;
-    note(first,t,d1,volume);note(second,t+gap,d2,volume);
-    if(slow){note(first,t+togetherAt,1.35,1.15/2);note(second,t+togetherAt,1.35,1.15/2)}
+     if(association)associationPlayer.play(round.distance,first,t);
+     note(first,t+intervalAt,d1,volume);note(second,t+intervalAt+gap,d2,volume);
+     if(slow){note(first,t+togetherAt,1.35,1.15/2);note(second,t+togetherAt,1.35,1.15/2)}
    busyUntil=performance.now()+35+duration*1000;
    $('orb').classList.add('playing');
    endTimer=setTimeout(()=>{endTimer=null;$('orb').classList.remove('playing');refreshControls()},35+duration*1000);
-  }catch(e){console.error('Ошибка воспроизведения:',e);$('feedback').textContent='Не удалось воспроизвести звук.';refreshControls()}
+  }catch(e){cancelPlayback();console.error('Ошибка воспроизведения:',e);$('feedback').textContent='Не удалось воспроизвести звук.';refreshControls()}
  },wait);
  refreshControls();
 }
 function next(){
- cancelTransition();clearPlaybackTimers();round=generate();state='question';clearFeedback();$('card').classList.remove('idle');
+ cancelTransition();cancelPlayback();reviewWrong=false;round=generate();state='question';clearFeedback();$('card').classList.remove('idle');
   $('repeatLabel').textContent='Повторить вопрос';setStatus('Какой интервал звучит?',intervalType==='harmonic'?'Послушайте два одновременных звука и выберите ответ.':'Послушайте два звука по очереди и выберите ответ.');play();
 }
 function updateExplanation(){
+ $('feedback').querySelector('.association-name')?.remove();
+ const association=associationForRound();
+ if(association){
+  const label=document.createElement('span');label.className='association-name';label.textContent=' · Мелодия: '+association.name;$('feedback').append(label);
+ }
  if(!$('unpack').checked){$('explanation').textContent='';return}
  const distance=round.distance,unit=distance===1?'полутон':distance<=4?'полутона':'полутонов';
  $('explanation').textContent='Между звуками — '+distance+' '+unit+'. Нажмите ↻, чтобы повторить.';
@@ -261,7 +284,7 @@ function burstConfetti(){
 }
 function answer(distance){
  if(state!=='question'||loading||playTimer!==null||endTimer!==null)return;
- state='review';played++;const ok=distance===round.distance;
+ state='review';played++;const ok=distance===round.distance;reviewWrong=!ok;
  rates[round.distance]=ok?(rates[round.distance]||0)*.85:Math.min(1,(rates[round.distance]||0)+.35);
  try{localStorage.setItem(adaptiveKey,JSON.stringify(rates))}catch{}
  progress.record({correct:ok,mode:{timbre,intervalType},task:round.distance+':'+(intervalType==='harmonic'?'together':round.dir>0?'up':'down'),expected:names.get(round.distance),actual:names.get(distance)});
@@ -273,9 +296,9 @@ function answer(distance){
  updateExplanation();
  $('repeatLabel').textContent='Повторить объяснение';setStatus(ok?'Интервал определён':'Разберём интервал','Следующее задание начнётся автоматически.');
   if(ok)burstConfetti();
- feedbackSound(ok);
- if(!ok&&$('unpack').checked)play(true);
+ if(!ok&&$('unpack').checked)play(true,true);
  else {
+  feedbackSound(ok);
   const advanceDelay=$('unpack').checked?4600:1800;
   scheduleAdvance(ok?advanceDelay*.7:advanceDelay);
   if(performance.now()<busyUntil)endTimer=setTimeout(()=>{endTimer=null;refreshControls()},Math.max(0,busyUntil-performance.now()));
@@ -295,13 +318,14 @@ async function selectMode(mode){
  const request=++modeRequest;
  if(state==='idle')timbre=mode;
  else{
-  loading=true;cancelTransition();refreshControls();
+  loading=true;cancelTransition();cancelPlayback();refreshControls();
   try{await Promise.all([unlock(),ensureBank(mode)]);if(request!==modeRequest)return;timbre=mode}
   catch(e){if(request!==modeRequest)return;console.error(e);$('feedback').textContent='Не удалось загрузить звук.'}
   finally{if(request===modeRequest)loading=false}
  }
  if(request!==modeRequest)return;
  for(const m of ['piano','electric']){$(m).setAttribute('aria-pressed',String(m===timbre));$(m).classList.toggle('active',m===timbre)}
+ if(state==='review')updateExplanation();
  if(state==='question'||state==='review')play(state==='review');else refreshControls();
 }
 function selectIntervalType(type){
@@ -309,12 +333,12 @@ function selectIntervalType(type){
  intervalType=type;
  for(const name of ['melodic','harmonic']){$(name).setAttribute('aria-pressed',String(name===type));$(name).classList.toggle('active',name===type)}
  if(state!=='review')$('hint').textContent=type==='harmonic'?'Два звука одновременно.':'Два звука по очереди.';
+ if(state==='review')updateExplanation();
  if(state==='question'||state==='review')play(state==='review');
 }
 function reset(){progress.reset();
- beginRequest++;modeRequest++;cancelTransition();clearPlaybackTimers();
- for(const source of liveSources){try{source.stop()}catch{}}liveSources.clear();
- busyUntil=-Infinity;loading=false;round=null;state='idle';played=correct=streak=record=0;
+ beginRequest++;modeRequest++;cancelTransition();cancelPlayback();
+ busyUntil=-Infinity;loading=false;reviewWrong=false;round=null;state='idle';played=correct=streak=record=0;
  try{localStorage.removeItem(recordKey)}catch{}
  clearFeedback();sync();$('card').classList.add('idle');$('orb').classList.remove('playing');
  $('start').disabled=false;$('start').querySelector('small').textContent='НАЧАТЬ';
@@ -324,7 +348,14 @@ $('reset').addEventListener('click',reset);
 for(const mode of ['piano','electric'])$(mode).addEventListener('click',()=>selectMode(mode));
 for(const type of ['melodic','harmonic'])$(type).addEventListener('click',()=>selectIntervalType(type));
 $('start').addEventListener('click',begin);
-$('repeat').addEventListener('click',()=>{if(!loading&&playTimer===null&&endTimer===null){if(state==='question')play();else if(state==='review')play(true)}});
+$('repeat').addEventListener('click',()=>{if(!loading){if(state==='review')play(true);else if(state==='question'&&playTimer===null&&endTimer===null)play()}});
+$('unpack').addEventListener('change',()=>{
+ if(state!=='review')return;
+ updateExplanation();
+ if($('unpack').checked&&reviewWrong)play(true);
+ else{cancelTransition();cancelPlayback();scheduleAdvance(1800);refreshControls();}
+});
+window.addEventListener('pagehide',()=>{cancelTransition();cancelPlayback();});
 buttons.forEach(b=>b.addEventListener('click',()=>answer(Number(b.dataset.interval))));
 document.addEventListener('keydown',e=>{if(e.repeat||e.altKey||e.metaKey||e.ctrlKey||/INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName))return;if(state==='question'&&/^[0-9]$/.test(e.key))answer(distances[e.key==='0'?9:Number(e.key)-1]);else if(e.code==='Space'&&state!=='idle'&&document.activeElement.tagName!=='BUTTON'){e.preventDefault();$('repeat').click()}});
 })();
