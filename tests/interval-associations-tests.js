@@ -8,32 +8,51 @@
     try { await fn(); results.push({ name, ok: true }); }
     catch (error) { results.push({ name, ok: false, error: error.message }); }
   }
-  const offsets = {
-    1: [0, 1, 0, 1], 2: [0, 2, 3, 0, 3], 3: [0, 3, 7, 3, 5],
-    4: [0, 4, 4, 4, 2, 0], 5: [0, 5, 0, 2, 4], 6: [0, 6, 7],
-    7: [0, 7, 5, 4, 2, 12], 8: [0, 8, 7, 5], 9: [0, 9, 9, 7, 9, 5],
-    10: [0, 10, 9, 5, 3], 11: [0, 11, 12, 11, 7], 12: [0, 12, 11, 7, 9]
+  const phrases = {
+    1: [[0, 1], [1, .5], [0, 1], [1, .5], [0, .5], [1, .5]],
+    2: [[0, .75], [2, .25], [3, .5], [0, .5], [3, .25], [3, .25], [2, .25], [0, .25], [2, .5], [-5, .75]],
+    3: [[0, .5], [3, .5], [7, .5], [3, .5], [5, 1.5]],
+    4: [[0, .5], [4, .5], [4, .5], [4, .5], [2, .25], [0, .25], [7, 1.5]],
+    5: [[0, .35], [5, .7], [0, .5], [2, .2], [4, .7], [-3, .35], [-3, .35], [2, .7], [0, .5], [-2, .2], [0, .7], [-7, .8]],
+    6: [[0, .75], [6, .75], [7, 1.5]],
+    7: [[0, 1.8], [7, 1.8], [5, .3], [4, .3], [2, .3], [12, 1.8], [7, .9], [5, .3], [4, .3], [2, .3], [12, 1.8], [7, .9], [5, .3], [4, .3], [5, .3], [2, 1.8]],
+    8: [[0, .5], [8, .5], [8, .5], [8, .5], [8, .5], [8, .5], [7, 1], [7, .5], [10, .5], [10, .5], [8, .5], [7, .5], [7, .25], [8, .25], [5, 1]],
+    9: [[0, .5], [9, .5], [9, .5], [7, .5], [9, .5], [5, .5], [0, .5], [0, 1]],
+    10: [[0, .5], [10, .25], [12, .5], [0, .5], [10, .25], [12, .5], [10, .5], [-2, .5], [10, .25], [12, .75]],
+    11: [[0, 1], [11, .5], [9, 1], [0, 1], [11, .5], [9, 1]],
+    12: [[0, 1], [12, 1], [11, .5], [7, .25], [9, .25], [11, .5], [12, 1]]
   };
-  await test('Словарь: все 12 фрагментов, заданные высоты, короткие ритмы при 126 BPM', () => {
-    for (const [distance, expected] of Object.entries(offsets)) {
+  await test('Словарь: все 12 фрагментов в формате [полутоны, доли], точные ноты и ритм при 140 BPM', () => {
+    for (const [distance, expected] of Object.entries(phrases)) {
       const melody = A.get(distance);
-      assert(JSON.stringify(melody.offsets) === JSON.stringify(expected), 'Высоты: ' + distance);
-      assert(melody.beats.length === expected.length && melody.beats.every(n => n > 0), 'Ритм: ' + distance);
-      assert(A.duration(distance) > 1 && A.duration(distance) < 3, 'Длина фрагмента: ' + distance);
+      assert(JSON.stringify(melody.notes) === JSON.stringify(expected), 'Ноты и ритм: ' + distance);
+      assert(melody.notes.every(([offset, beats]) => Number.isInteger(offset) && beats > 0), 'Формат: ' + distance);
+      assert(near(A.duration(distance), expected.reduce((sum, [, beats]) => sum + beats * 60 / 140, 0)), 'Расчёт длительности');
+      const limit = Number(distance) === 7 ? 6 : Number(distance) === 8 ? 3.5 : 3;
+      assert(A.duration(distance) > 1 && A.duration(distance) < limit, 'Длина фрагмента: ' + distance);
     }
-    assert(A.bpm === 126 && Object.isFrozen(A.melodies) && Object.isFrozen(A.get(1).offsets), 'Словарь изменяем');
+    assert(A.get(10).name === "RHCP — «Can't Stop»" && A.get(11).name === 'a-ha — «Take On Me»', 'Обновлённые названия');
+    assert(A.get(8).name === '«Прекрасное далёко»' && near(A.duration(8), 8 * 60 / 140), 'Припев малой сексты');
+    assert(A.get(7).notes.length === 16 && near(A.duration(7), 13.5 * 60 / 140), 'Полная фраза квинты');
+    assert(A.get(7).notes.every(([, beats]) => [1, 3, 6].some(n => near(beats / .3, n))), 'Нет соотношения длительностей 6:3:1');
+    assert(A.bpm === 140 && Object.isFrozen(A.melodies) && Object.isFrozen(A.get(1).notes) && Object.isFrozen(A.get(1).notes[0]), 'Словарь изменяем');
   });
   await test('Модуль: точная транспозиция от нижней ноты и отмена всех будущих звуков', () => {
     const sources = [], player = A.createPlayer((midi, start, length) => {
       const source = { midi, start, length, stops: 0, stop() { this.stops++; } };
       sources.push(source); return source;
     });
-    for (const base of [48, 60, 72]) for (const distance of Object.keys(offsets).map(Number)) {
+    for (const base of [48, 60, 72]) for (const distance of Object.keys(phrases).map(Number)) {
       const before = sources.length, info = player.play(distance, base, 10);
       const notes = sources.slice(before);
       assert(notes[0].midi === base && notes[1].midi === base + distance, 'Первые две ноты');
-      assert(notes.every((n, i) => n.midi === base + offsets[distance][i]), 'Транспозиция');
-      assert(notes.every((n, i) => !i || n.start >= notes[i - 1].start + notes[i - 1].length), 'Наложение нот');
+      let expectedStart = 10;
+      notes.forEach((n, i) => {
+        const [offset, beats] = phrases[distance][i], length = beats * 60 / 140;
+        assert(n.midi === base + offset, 'Транспозиция');
+        assert(near(n.start, expectedStart) && near(n.length, length), 'Точная длительность/ритм');
+        expectedStart += length;
+      });
       assert(info.name === A.get(distance).name && near(info.duration, A.duration(distance)), 'Описание фрагмента');
       player.cancel(); player.cancel();
       assert(notes.every(n => n.stops === 1), 'Отмена не остановила будущие ноты ровно один раз');
@@ -110,16 +129,16 @@
     }
     return { frame, w, d, m, $, settle, start, wrong, close() { w.dispatchEvent(new w.Event('pagehide')); frame.remove(); } };
   }
-  await test('№8: ошибочный гармонический интервал → мелодия, пауза, низкий, высокий, вместе; название и автопереход', async () => {
+  await test('№8: ошибочный гармонический интервал → низкий, высокий, вместе, пауза, мелодия; название и автопереход', async () => {
     const f = await fixture({ descending: true, base: 72 });
     try {
       await f.start(); const notes = f.wrong(), fragment = A.get(7);
       const signals = f.m.sources.filter(s => s.kind === 'signal');
       assert(signals.length === 2 && notes[0].at > Math.max(...signals.map(s => s.until)), 'Звуковой сигнал изменился или перекрыт разбором');
-      assert(notes.length === 4 + fragment.offsets.length, 'Нет всей цепочки');
-      const count = fragment.offsets.length, interval = notes.slice(count);
-      assert(notes.slice(0, count).every((s, i) => near(s.midi, 72 + fragment.offsets[i])), 'Неверная мелодия/транспозиция');
-      assert(near(interval[0].at - notes[0].at - A.duration(7), .35), 'Нет короткой паузы после мелодии');
+      assert(notes.length === 4 + fragment.notes.length, 'Нет всей цепочки');
+      const interval = notes.slice(0, 4), melody = notes.slice(4);
+      assert(melody.every((s, i) => near(s.midi, 72 + fragment.notes[i][0])), 'Неверная мелодия/транспозиция');
+      assert(near(melody[0].at - (interval[2].until - .005), .35), 'Нет короткой паузы перед мелодией');
       assert(near(interval[0].midi, 72) && near(interval[1].midi, 79), 'Разбор не снизу вверх');
       assert(interval[1].at > interval[0].until && interval[2].at > interval[1].until, 'Части разбора перекрываются');
       assert(near(interval[2].at, interval[3].at), 'Нет гармонического повтора');
@@ -137,8 +156,25 @@
       const f = await fixture({ distance: 3, descending });
       try {
         f.$('melodic').click(); await f.start(); const notes = f.wrong();
-        assert(notes.length === (descending ? 4 : 9), 'Направление ассоциации');
+        assert(notes.length === (descending ? 4 : 4 + A.get(3).notes.length), 'Направление ассоциации');
         assert(Boolean(f.d.querySelector('.association-name')) === !descending, 'Подпись для неверного направления');
+      } finally { f.close(); }
+    }
+  });
+  await test('№8: обновлённые септимы — название, все ноты и точные beats, включая отрицательные смещения', async () => {
+    for (const distance of [10, 11]) {
+      const f = await fixture({ distance, base: 48 });
+      try {
+        await f.start(); const melody = f.wrong().slice(4), expected = A.get(distance);
+        assert(f.$('feedback').textContent.includes(expected.name), 'Неверное название септимы');
+        assert(melody.length === expected.notes.length, 'Обрыв фразы септимы');
+        let at = melody[0].at;
+        melody.forEach((source, i) => {
+          const [offset, beats] = expected.notes[i], length = beats * 60 / 140;
+          assert(near(source.midi, 48 + offset) && near(source.at, at), 'Неверные ноты/ритм септимы');
+          assert(near(source.until - source.at - .005, length), 'Длительность ноты не из beats');
+          at += length;
+        });
       } finally { f.close(); }
     }
   });
@@ -157,12 +193,12 @@
   await test('№8: повтор во время мелодии останавливает цепочку и все будущие звуки, не считает ответ дважды', async () => {
     const f = await fixture();
     try {
-      await f.start(); const old = f.wrong(); f.m.advance(700);
+      await f.start(); const old = f.wrong(); f.m.advance(4300);
       assert(!f.$('repeat').disabled && f.w.getComputedStyle(f.$('repeat')).visibility === 'visible', 'Повтор недоступен во время мелодии');
       f.$('repeat').click(); f.m.advance(0);
       assert(old.every(s => s.cancelled || s.ended), 'Старые звуки продолжаются');
       assert(f.$('total').textContent === '1' && f.m.rows.length === 1, 'Повтор изменил статистику');
-      assert(f.m.sources.filter(s => s.kind === 'note' && !s.cancelled && !s.ended).length === 10, 'Новая цепочка не началась');
+      assert(f.m.sources.filter(s => s.kind === 'note' && !s.cancelled && !s.ended).length === 4 + A.get(7).notes.length, 'Новая цепочка не началась');
       f.$('reset').click();
       assert(f.m.sources.every(s => s.cancelled || s.ended) && !f.m.timers.size, 'Сброс не отменил таймеры/звук');
       f.m.advance(20000); assert(f.$('card').classList.contains('idle'), 'Отменённый таймер начал вопрос');
@@ -171,7 +207,7 @@
   await test('№8: переход к следующему вопросу до конца мелодии отменяет её оставшиеся звуки', async () => {
     const f = await fixture();
     try {
-      await f.start(); const old = f.wrong(); f.m.advance(100);
+      await f.start(); const old = f.wrong(); f.m.advance(4300);
       // Invoke the real next-question callback early, as a future manual Next would.
       const [id, transition] = [...f.m.timers].sort((a, b) => b[1].at - a[1].at)[0];
       f.m.timers.delete(id); transition.fn(); f.m.advance(0);
@@ -188,7 +224,7 @@
       assert(old.every(s => s.cancelled), 'Смена тембра не прервала звук');
       await f.settle(); f.m.advance(0);
       const electric = f.m.sources.filter(s => s.kind === 'note' && !s.cancelled && !s.ended);
-      assert(electric.length === 10 && electric.every(s => s.buffer.bank === 1), 'Мелодия не использует выбранный тембр');
+      assert(electric.length === 4 + A.get(7).notes.length && electric.every(s => s.buffer.bank === 1), 'Мелодия не использует выбранный тембр');
       old = electric; f.$('melodic').click(); f.m.advance(0);
       assert(old.every(s => s.cancelled) && !f.d.querySelector('.association-name'), 'Смена направления не убрала мелодию');
       assert(f.m.sources.filter(s => s.kind === 'note' && !s.cancelled && !s.ended).length === 4, 'Нисходящий разбор стал мелодией');
