@@ -15,7 +15,8 @@
     // Riff A, bar 7: David Stanley guitar score, quarter = 88.
     // null denotes silence (including the unpitched muted guitar stroke).
     10: ["RHCP — «Can't Stop»", [[0, .25], [null, .25], [10, .5], [12, .5], [0, .25], [0, .25], [0, .25], [10, .25], [null, .25], [12, .5], [0, .25], [0, .25], [0, .25]], {bpm:88, gate:.65}],
-    11: ['a-ha — «Take On Me»', [[0, 1], [11, .5], [9, 1], [0, 1], [11, .5], [9, 1]]],
+    // Vocal chorus, "Take — on — me": A3, G#4, A4; one 4/4 bar each.
+    11: ['a-ha — «Take On Me»', [[0, 4], [11, 4], [12, 4]], {bpm:169}],
     12: ['«Somewhere Over the Rainbow»', [[0, 1], [12, 1], [11, .5], [7, .25], [9, .25], [11, .5], [12, 1]]]
   };
   const bpm = 140;

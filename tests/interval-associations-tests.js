@@ -19,17 +19,17 @@
     8: [[0, .5], [8, .5], [8, .5], [8, .5], [8, .5], [8, .5], [7, 1]],
     9: [[0, .5], [9, .5], [9, .5], [7, .5], [9, .5], [5, .5], [0, .5], [0, 1]],
     10: [[0, .25], [null, .25], [10, .5], [12, .5], [0, .25], [0, .25], [0, .25], [10, .25], [null, .25], [12, .5], [0, .25], [0, .25], [0, .25]],
-    11: [[0, 1], [11, .5], [9, 1], [0, 1], [11, .5], [9, 1]],
+    11: [[0, 4], [11, 4], [12, 4]],
     12: [[0, 1], [12, 1], [11, .5], [7, .25], [9, .25], [11, .5], [12, 1]]
   };
-  await test('Словарь: все 12 фрагментов, паузы и ритм; отдельные темпы Катюши и RHCP', () => {
+  await test('Словарь: все 12 фрагментов, паузы и ритм; отдельные темпы Катюши, RHCP и a-ha', () => {
     for (const [distance, expected] of Object.entries(phrases)) {
       const melody = A.get(distance);
       assert(JSON.stringify(melody.notes) === JSON.stringify(expected), 'Ноты и ритм: ' + distance);
       assert(melody.notes.every(([offset, beats]) => (offset === null || Number.isInteger(offset)) && beats > 0), 'Формат: ' + distance);
-      assert(melody.bpm === ({2: 112, 10: 88}[distance] || 140), 'Темп мелодии: ' + distance);
+      assert(melody.bpm === ({2: 112, 10: 88, 11: 169}[distance] || 140), 'Темп мелодии: ' + distance);
       assert(near(A.duration(distance), expected.reduce((sum, [, beats]) => sum + beats * 60 / melody.bpm, 0)), 'Расчёт длительности');
-      const limit = Number(distance) === 7 ? 6 : Number(distance) === 2 ? 4.5 : 3;
+      const limit = Number(distance) === 7 ? 6 : [2, 11].includes(Number(distance)) ? 4.5 : 3;
       assert(A.duration(distance) > 1 && A.duration(distance) < limit, 'Длина фрагмента: ' + distance);
     }
     assert(A.get(10).name === "RHCP — «Can't Stop»" && A.get(11).name === 'a-ha — «Take On Me»', 'Обновлённые названия');
@@ -194,7 +194,7 @@
       } finally { f.close(); }
     }
   });
-  await test('№8: обновлённые септимы — название, все ноты и точные beats, включая отрицательные смещения', async () => {
+  await test('№8: обновлённые септимы — название, все ноты, паузы и точные beats', async () => {
     for (const distance of [10, 11]) {
       const f = await fixture({ distance, base: 48 });
       try {
@@ -211,6 +211,26 @@
           }
           at += length;
         });
+      } finally { f.close(); }
+    }
+  });
+  await test('№8: Take On Me в обоих тембрах — первые две ноты совпадают с большой септимой вопроса, третья выше на полтона', async () => {
+    for (const bank of [0, 1]) {
+      const f = await fixture({ distance: 11, base: 60 });
+      try {
+        await f.start();
+        if (bank) { f.$('electric').click(); await f.settle(); f.m.advance(1500); }
+        const question = f.m.sources.filter(s => s.kind === 'note' && !s.cancelled && s.buffer.bank === bank);
+        const notes = f.wrong(), melody = notes.slice(0, 3);
+        assert(notes.length === 7 && melody.every(s => s.buffer.bank === bank), 'Три ноты и выбранный тембр');
+        assert(near(melody[0].midi, 60) && near(melody[1].midi, 71) && near(melody[2].midi, 72), 'Неверная фраза 0 → 11 → 12');
+        assert(near(melody[1].midi - melody[0].midi, 11), 'Первая пара — не большая септима');
+        assert(question.length === 2 && question.every((s, i) => near(s.midi, melody[i].midi)), 'Первые ноты не совпали с вопросом');
+        melody.forEach((s, i) => {
+          assert(near(s.at - melody[0].at, i * 4 * 60 / 169), 'Неверные начала нот');
+          assert(near(s.until - s.at - .005, 4 * 60 / 169), 'Не целая нота');
+        });
+        assert(near(A.duration(11), 12 * 60 / 169), 'Длительность припева');
       } finally { f.close(); }
     }
   });
