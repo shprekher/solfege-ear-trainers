@@ -234,8 +234,9 @@ function play(slow=false,withErrorSignal=false){
  if(withErrorSignal)feedbackSound(false);
  const harmonic=intervalType==='harmonic'&&!slow;
  const wait=Math.max(0,busyUntil-performance.now()),gap=harmonic?0:(slow?.83:.62),d1=harmonic?1.35:(slow?.67:.53),d2=harmonic?1.35:(slow?.78:.7);
- const togetherAt=1.9,association=slow?associationForRound():null,melodyAt=togetherAt+1.35+.35;
- const duration=slow?(association?melodyAt+associations.duration(round.distance):togetherAt+1.35):Math.max(d1,gap+d2);
+ const association=slow?associationForRound():null;
+ const intervalAt=association?associations.duration(round.distance)+.35:0,togetherAt=intervalAt+1.9;
+ const duration=slow?togetherAt+1.35:Math.max(d1,gap+d2);
  if(state==='review')scheduleAdvance(Math.max(4600,wait+duration*1000+1000));
  playTimer=setTimeout(()=>{
   playTimer=null;
@@ -246,9 +247,9 @@ function play(slow=false,withErrorSignal=false){
     const volume=harmonic?1.15/2:1.15;
     const first=slow?Math.min(round.first,round.second):round.first;
     const second=slow?Math.max(round.first,round.second):round.second;
-    note(first,t,d1,volume);note(second,t+gap,d2,volume);
+     if(association)associationPlayer.play(round.distance,first,t);
+     note(first,t+intervalAt,d1,volume);note(second,t+intervalAt+gap,d2,volume);
     if(slow){note(first,t+togetherAt,1.35,1.15/2);note(second,t+togetherAt,1.35,1.15/2)}
-    if(association)associationPlayer.play(round.distance,first,t+melodyAt);
    busyUntil=performance.now()+35+duration*1000;
    $('orb').classList.add('playing');
    endTimer=setTimeout(()=>{endTimer=null;$('orb').classList.remove('playing');refreshControls()},35+duration*1000);

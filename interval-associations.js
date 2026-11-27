@@ -11,18 +11,24 @@
     7: ['«Звёздные войны»', [[0, 1.8], [7, 1.8], [5, .3], [4, .3], [2, .3], [12, 1.8], [7, .9], [5, .3], [4, .3], [2, .3], [12, 1.8], [7, .9], [5, .3], [4, .3], [5, .3], [2, 1.8]]],
     8: ['«Прекрасное далёко»', [[0, .5], [8, .5], [8, .5], [8, .5], [8, .5], [8, .5], [7, 1], [7, .5], [10, .5], [10, .5], [8, .5], [7, .5], [7, .25], [8, .25], [5, 1]]],
     9: ['«В лесу родилась ёлочка»', [[0, .5], [9, .5], [9, .5], [7, .5], [9, .5], [5, .5], [0, .5], [0, 1]]],
-    10: ["RHCP — «Can't Stop»", [[0, .5], [10, .25], [12, .5], [0, .5], [10, .25], [12, .5], [10, .5], [-2, .5], [10, .25], [12, .75]]],
+    // Riff A, bar 7: David Stanley guitar score, quarter = 88.
+    // null denotes silence (including the unpitched muted guitar stroke).
+    10: ["RHCP — «Can't Stop»", [[0, .25], [null, .25], [10, .5], [12, .5], [0, .25], [0, .25], [0, .25], [10, .25], [null, .25], [12, .5], [0, .25], [0, .25], [0, .25]], {bpm:88, gate:.65}],
     11: ['a-ha — «Take On Me»', [[0, 1], [11, .5], [9, 1], [0, 1], [11, .5], [9, 1]]],
     12: ['«Somewhere Over the Rainbow»', [[0, 1], [12, 1], [11, .5], [7, .25], [9, .25], [11, .5], [12, 1]]]
   };
+  const bpm = 140;
   const melodies = Object.freeze(Object.fromEntries(Object.entries(definitions).map(
-    ([distance, [name, notes]]) => [distance, Object.freeze({
-      name, notes: Object.freeze(notes.map(pair => Object.freeze(pair)))
+    ([distance, [name, notes, playback = {}]]) => [distance, Object.freeze({
+      name, notes: Object.freeze(notes.map(pair => Object.freeze(pair))),
+      bpm: playback.bpm || bpm, gate: playback.gate ?? 1
     })]
   )));
-  const bpm = 140, beat = 60 / bpm;
   const get = distance => melodies[distance] || null;
-  const duration = distance => get(distance)?.notes.reduce((sum, [, beats]) => sum + beats * beat, 0) || 0;
+  const duration = distance => {
+    const melody = get(distance);
+    return melody ? melody.notes.reduce((sum, [, beats]) => sum + beats * 60 / melody.bpm, 0) : 0;
+  };
   // note(midi, audioTime, seconds, volume) must return a stoppable source.
   function createPlayer(note) {
     let sources = [];
@@ -37,8 +43,8 @@
       let at = start;
       try {
         melody.notes.forEach(([offset, beats]) => {
-          const length = beats * beat;
-          sources.push(note(base + offset, at, length, volume));
+          const length = beats * 60 / melody.bpm;
+          if (offset !== null) sources.push(note(base + offset, at, length * melody.gate, volume));
           at += length;
         });
       } catch (error) { cancel(); throw error; }

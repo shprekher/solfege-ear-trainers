@@ -18,16 +18,17 @@
     7: [[0, 1.8], [7, 1.8], [5, .3], [4, .3], [2, .3], [12, 1.8], [7, .9], [5, .3], [4, .3], [2, .3], [12, 1.8], [7, .9], [5, .3], [4, .3], [5, .3], [2, 1.8]],
     8: [[0, .5], [8, .5], [8, .5], [8, .5], [8, .5], [8, .5], [7, 1], [7, .5], [10, .5], [10, .5], [8, .5], [7, .5], [7, .25], [8, .25], [5, 1]],
     9: [[0, .5], [9, .5], [9, .5], [7, .5], [9, .5], [5, .5], [0, .5], [0, 1]],
-    10: [[0, .5], [10, .25], [12, .5], [0, .5], [10, .25], [12, .5], [10, .5], [-2, .5], [10, .25], [12, .75]],
+    10: [[0, .25], [null, .25], [10, .5], [12, .5], [0, .25], [0, .25], [0, .25], [10, .25], [null, .25], [12, .5], [0, .25], [0, .25], [0, .25]],
     11: [[0, 1], [11, .5], [9, 1], [0, 1], [11, .5], [9, 1]],
     12: [[0, 1], [12, 1], [11, .5], [7, .25], [9, .25], [11, .5], [12, 1]]
   };
-  await test('Словарь: все 12 фрагментов в формате [полутоны, доли], точные ноты и ритм при 140 BPM', () => {
+  await test('Словарь: все 12 фрагментов, паузы и ритм; 140 BPM по умолчанию, 88 BPM для RHCP', () => {
     for (const [distance, expected] of Object.entries(phrases)) {
       const melody = A.get(distance);
       assert(JSON.stringify(melody.notes) === JSON.stringify(expected), 'Ноты и ритм: ' + distance);
-      assert(melody.notes.every(([offset, beats]) => Number.isInteger(offset) && beats > 0), 'Формат: ' + distance);
-      assert(near(A.duration(distance), expected.reduce((sum, [, beats]) => sum + beats * 60 / 140, 0)), 'Расчёт длительности');
+      assert(melody.notes.every(([offset, beats]) => (offset === null || Number.isInteger(offset)) && beats > 0), 'Формат: ' + distance);
+      assert(melody.bpm === (Number(distance) === 10 ? 88 : 140), 'Темп мелодии: ' + distance);
+      assert(near(A.duration(distance), expected.reduce((sum, [, beats]) => sum + beats * 60 / melody.bpm, 0)), 'Расчёт длительности');
       const limit = Number(distance) === 7 ? 6 : Number(distance) === 8 ? 3.5 : 3;
       assert(A.duration(distance) > 1 && A.duration(distance) < limit, 'Длина фрагмента: ' + distance);
     }
@@ -46,17 +47,36 @@
       const before = sources.length, info = player.play(distance, base, 10);
       const notes = sources.slice(before);
       assert(notes[0].midi === base && notes[1].midi === base + distance, 'Первые две ноты');
-      let expectedStart = 10;
-      notes.forEach((n, i) => {
-        const [offset, beats] = phrases[distance][i], length = beats * 60 / 140;
-        assert(n.midi === base + offset, 'Транспозиция');
-        assert(near(n.start, expectedStart) && near(n.length, length), 'Точная длительность/ритм');
+      let expectedStart = 10, index = 0;
+      const melody = A.get(distance);
+      phrases[distance].forEach(([offset, beats]) => {
+        const length = beats * 60 / melody.bpm;
+        if (offset !== null) {
+          const n = notes[index++];
+          assert(n.midi === base + offset, 'Транспозиция');
+          assert(near(n.start, expectedStart) && near(n.length, length * melody.gate), 'Точная длительность/ритм');
+        }
         expectedStart += length;
       });
+      assert(index === notes.length, 'Пауза стала звучащей нотой');
       assert(info.name === A.get(distance).name && near(info.duration, A.duration(distance)), 'Описание фрагмента');
       player.cancel(); player.cancel();
       assert(notes.every(n => n.stops === 1), 'Отмена не остановила будущие ноты ровно один раз');
     }
+  });
+  await test('RHCP: первый такт Riff A — 4 доли, паузы, повторы низкой ноты и короткая артикуляция', () => {
+    const calls = [], player = A.createPlayer((midi, start, length) => {
+      calls.push({ midi, start, length }); return { stop() {} };
+    });
+    player.play(10, 60, 0);
+    const onsets = [0, .5, 1, 1.5, 1.75, 2, 2.25, 2.75, 3.25, 3.5, 3.75];
+    const pitches = [0, 10, 12, 0, 0, 0, 10, 12, 0, 0, 0];
+    assert(calls.length === 11 && near(A.duration(10), 4 * 60 / 88), 'Не один такт');
+    calls.forEach((n, i) => {
+      assert(n.midi === 60 + pitches[i] && near(n.start, onsets[i] * 60 / 88), 'Сетка риффа');
+      assert(n.length < (i + 1 < calls.length ? calls[i + 1].start - n.start : A.duration(10) - n.start), 'Нет короткой артикуляции');
+    });
+    assert(near(calls[0].length, .25 * 60 / 88 * .65), 'Длительность звучания RHCP');
   });
   await test('Модуль: повтор отменяет прежний фрагмент; исключение останавливает уже созданные звуки', () => {
     const calls = [], player = A.createPlayer(() => {
@@ -129,17 +149,18 @@
     }
     return { frame, w, d, m, $, settle, start, wrong, close() { w.dispatchEvent(new w.Event('pagehide')); frame.remove(); } };
   }
-  await test('№8: ошибочный гармонический интервал → низкий, высокий, вместе, пауза, мелодия; название и автопереход', async () => {
-    const f = await fixture({ descending: true, base: 72 });
-    try {
-      await f.start(); const notes = f.wrong(), fragment = A.get(7);
+  await test('№8: для всех 10 интервалов мелодия → пауза → низкий → высокий → вместе; название и автопереход', async () => {
+    for (const distance of [1, 2, 3, 4, 5, 7, 8, 9, 10, 11]) {
+     const f = await fixture({ distance, descending: true, base: 72 });
+     try {
+      await f.start(); const notes = f.wrong(), fragment = A.get(distance), pitched = fragment.notes.filter(([offset]) => offset !== null);
       const signals = f.m.sources.filter(s => s.kind === 'signal');
       assert(signals.length === 2 && notes[0].at > Math.max(...signals.map(s => s.until)), 'Звуковой сигнал изменился или перекрыт разбором');
-      assert(notes.length === 4 + fragment.notes.length, 'Нет всей цепочки');
-      const interval = notes.slice(0, 4), melody = notes.slice(4);
-      assert(melody.every((s, i) => near(s.midi, 72 + fragment.notes[i][0])), 'Неверная мелодия/транспозиция');
-      assert(near(melody[0].at - (interval[2].until - .005), .35), 'Нет короткой паузы перед мелодией');
-      assert(near(interval[0].midi, 72) && near(interval[1].midi, 79), 'Разбор не снизу вверх');
+      assert(notes.length === 4 + pitched.length, 'Нет всей цепочки');
+      const melody = notes.slice(0, pitched.length), interval = notes.slice(pitched.length);
+      assert(melody.every((s, i) => near(s.midi, 72 + pitched[i][0])), 'Неверная мелодия/транспозиция');
+      assert(near(interval[0].at - melody[0].at - A.duration(distance), .35), 'Нет короткой паузы после мелодии');
+      assert(near(interval[0].midi, 72) && near(interval[1].midi, 72 + distance), 'Разбор не снизу вверх');
       assert(interval[1].at > interval[0].until && interval[2].at > interval[1].until, 'Части разбора перекрываются');
       assert(near(interval[2].at, interval[3].at), 'Нет гармонического повтора');
       assert(f.$('feedback').textContent.includes(fragment.name) && f.$('total').textContent === '1', 'Название или статистика');
@@ -149,7 +170,8 @@
       f.m.advance(1100);
       assert(f.$('prompt').textContent === 'Какой интервал звучит?' && !f.$('feedback').textContent, 'Нет автоперехода/не убрана подпись');
       assert(notes.every(s => s.cancelled || s.ended), 'Следующий вопрос оставил старые источники');
-    } finally { f.close(); }
+     } finally { f.close(); }
+    }
   });
   await test('№8: нисходящее мелодическое задание без ассоциации; восходящее — с ассоциацией', async () => {
     for (const descending of [true, false]) {
@@ -165,14 +187,17 @@
     for (const distance of [10, 11]) {
       const f = await fixture({ distance, base: 48 });
       try {
-        await f.start(); const melody = f.wrong().slice(4), expected = A.get(distance);
+        await f.start(); const expected = A.get(distance), melody = f.wrong().slice(0, expected.notes.filter(([offset]) => offset !== null).length);
         assert(f.$('feedback').textContent.includes(expected.name), 'Неверное название септимы');
-        assert(melody.length === expected.notes.length, 'Обрыв фразы септимы');
-        let at = melody[0].at;
-        melody.forEach((source, i) => {
-          const [offset, beats] = expected.notes[i], length = beats * 60 / 140;
-          assert(near(source.midi, 48 + offset) && near(source.at, at), 'Неверные ноты/ритм септимы');
-          assert(near(source.until - source.at - .005, length), 'Длительность ноты не из beats');
+        assert(melody.length === expected.notes.filter(([offset]) => offset !== null).length, 'Обрыв фразы септимы');
+        let at = melody[0].at, index = 0;
+        expected.notes.forEach(([offset, beats]) => {
+          const length = beats * 60 / expected.bpm;
+          if (offset !== null) {
+            const source = melody[index++];
+            assert(near(source.midi, 48 + offset) && near(source.at, at), 'Неверные ноты/ритм септимы');
+            assert(near(source.until - source.at - .005, length * expected.gate), 'Длительность ноты не из beats');
+          }
           at += length;
         });
       } finally { f.close(); }
@@ -193,7 +218,7 @@
   await test('№8: повтор во время мелодии останавливает цепочку и все будущие звуки, не считает ответ дважды', async () => {
     const f = await fixture();
     try {
-      await f.start(); const old = f.wrong(); f.m.advance(4300);
+      await f.start(); const old = f.wrong(); f.m.advance(700);
       assert(!f.$('repeat').disabled && f.w.getComputedStyle(f.$('repeat')).visibility === 'visible', 'Повтор недоступен во время мелодии');
       f.$('repeat').click(); f.m.advance(0);
       assert(old.every(s => s.cancelled || s.ended), 'Старые звуки продолжаются');
@@ -207,7 +232,7 @@
   await test('№8: переход к следующему вопросу до конца мелодии отменяет её оставшиеся звуки', async () => {
     const f = await fixture();
     try {
-      await f.start(); const old = f.wrong(); f.m.advance(4300);
+      await f.start(); const old = f.wrong(); f.m.advance(700);
       // Invoke the real next-question callback early, as a future manual Next would.
       const [id, transition] = [...f.m.timers].sort((a, b) => b[1].at - a[1].at)[0];
       f.m.timers.delete(id); transition.fn(); f.m.advance(0);
