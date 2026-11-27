@@ -10,7 +10,7 @@
   }
   const phrases = {
     1: [[0, 1], [1, .5], [0, 1], [1, .5], [0, .5], [1, .5]],
-    2: [[0, .75], [2, .25], [3, .5], [0, .5], [3, .25], [3, .25], [2, .25], [0, .25], [2, .5], [-5, .75]],
+    2: [[0, 1.5], [2, .5], [3, 1.5], [0, .5], [3, .5], [3, .5], [2, .5], [0, .5], [2, 1], [-5, 1]],
     3: [[0, .5], [3, .5], [7, .5], [3, .5], [5, 1.5]],
     4: [[0, .5], [4, .5], [4, .5], [4, .5], [2, .25], [0, .25], [7, 1.5]],
     5: [[0, .35], [5, .7], [0, .5], [2, .2], [4, .7], [-3, .35], [-3, .35], [2, .7], [0, .5], [-2, .2], [0, .7], [-7, .8]],
@@ -22,14 +22,14 @@
     11: [[0, 1], [11, .5], [9, 1], [0, 1], [11, .5], [9, 1]],
     12: [[0, 1], [12, 1], [11, .5], [7, .25], [9, .25], [11, .5], [12, 1]]
   };
-  await test('Словарь: все 12 фрагментов, паузы и ритм; 140 BPM по умолчанию, 88 BPM для RHCP', () => {
+  await test('Словарь: все 12 фрагментов, паузы и ритм; отдельные темпы Катюши и RHCP', () => {
     for (const [distance, expected] of Object.entries(phrases)) {
       const melody = A.get(distance);
       assert(JSON.stringify(melody.notes) === JSON.stringify(expected), 'Ноты и ритм: ' + distance);
       assert(melody.notes.every(([offset, beats]) => (offset === null || Number.isInteger(offset)) && beats > 0), 'Формат: ' + distance);
-      assert(melody.bpm === (Number(distance) === 10 ? 88 : 140), 'Темп мелодии: ' + distance);
+      assert(melody.bpm === ({2: 112, 10: 88}[distance] || 140), 'Темп мелодии: ' + distance);
       assert(near(A.duration(distance), expected.reduce((sum, [, beats]) => sum + beats * 60 / melody.bpm, 0)), 'Расчёт длительности');
-      const limit = Number(distance) === 7 ? 6 : 3;
+      const limit = Number(distance) === 7 ? 6 : Number(distance) === 2 ? 4.5 : 3;
       assert(A.duration(distance) > 1 && A.duration(distance) < limit, 'Длина фрагмента: ' + distance);
     }
     assert(A.get(10).name === "RHCP — «Can't Stop»" && A.get(11).name === 'a-ha — «Take On Me»', 'Обновлённые названия');
@@ -77,6 +77,17 @@
       assert(n.length < (i + 1 < calls.length ? calls[i + 1].start - n.start : A.duration(10) - n.start), 'Нет короткой артикуляции');
     });
     assert(near(calls[0].length, .25 * 60 / 88 * .65), 'Длительность звучания RHCP');
+  });
+  await test('Катюша: четыре такта 2/4, два пунктирных оборота и учебный темп 112 BPM', () => {
+    const calls = [], player = A.createPlayer((midi, start, length) => {
+      calls.push({ midi, start, length }); return { stop() {} };
+    });
+    player.play(2, 60, 0);
+    const onsets = [0, 1.5, 2, 3.5, 4, 4.5, 5, 5.5, 6, 7];
+    assert(calls.length === 10 && near(A.duration(2), 8 * 60 / 112), 'Длина фразы Катюши');
+    calls.forEach((n, i) => assert(near(n.start, onsets[i] * 60 / 112), 'Сетка Катюши'));
+    assert(near(calls[0].length, 3 * calls[1].length) && near(calls[2].length, 3 * calls[3].length), 'Пунктирный ритм 3:1');
+    assert(near(calls[8].length, 60 / 112) && near(calls[9].length, 60 / 112), 'Две заключительные четверти');
   });
   await test('Модуль: повтор отменяет прежний фрагмент; исключение останавливает уже созданные звуки', () => {
     const calls = [], player = A.createPlayer(() => {
