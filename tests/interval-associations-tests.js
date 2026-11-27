@@ -16,7 +16,7 @@
     5: [[0, .35], [5, .7], [0, .5], [2, .2], [4, .7], [-3, .35], [-3, .35], [2, .7], [0, .5], [-2, .2], [0, .7], [-7, .8]],
     6: [[0, .75], [6, .75], [7, 1.5]],
     7: [[0, 1.8], [7, 1.8], [5, .3], [4, .3], [2, .3], [12, 1.8], [7, .9], [5, .3], [4, .3], [2, .3], [12, 1.8], [7, .9], [5, .3], [4, .3], [5, .3], [2, 1.8]],
-    8: [[0, .5], [8, .5], [8, .5], [8, .5], [8, .5], [8, .5], [7, 1], [7, .5], [10, .5], [10, .5], [8, .5], [7, .5], [7, .25], [8, .25], [5, 1]],
+    8: [[0, .5], [8, .5], [8, .5], [8, .5], [8, .5], [8, .5], [7, 1]],
     9: [[0, .5], [9, .5], [9, .5], [7, .5], [9, .5], [5, .5], [0, .5], [0, 1]],
     10: [[0, .25], [null, .25], [10, .5], [12, .5], [0, .25], [0, .25], [0, .25], [10, .25], [null, .25], [12, .5], [0, .25], [0, .25], [0, .25]],
     11: [[0, 1], [11, .5], [9, 1], [0, 1], [11, .5], [9, 1]],
@@ -29,11 +29,11 @@
       assert(melody.notes.every(([offset, beats]) => (offset === null || Number.isInteger(offset)) && beats > 0), 'Формат: ' + distance);
       assert(melody.bpm === (Number(distance) === 10 ? 88 : 140), 'Темп мелодии: ' + distance);
       assert(near(A.duration(distance), expected.reduce((sum, [, beats]) => sum + beats * 60 / melody.bpm, 0)), 'Расчёт длительности');
-      const limit = Number(distance) === 7 ? 6 : Number(distance) === 8 ? 3.5 : 3;
+      const limit = Number(distance) === 7 ? 6 : 3;
       assert(A.duration(distance) > 1 && A.duration(distance) < limit, 'Длина фрагмента: ' + distance);
     }
     assert(A.get(10).name === "RHCP — «Can't Stop»" && A.get(11).name === 'a-ha — «Take On Me»', 'Обновлённые названия');
-    assert(A.get(8).name === '«Прекрасное далёко»' && near(A.duration(8), 8 * 60 / 140), 'Припев малой сексты');
+    assert(A.get(8).name === '«Прекрасное далёко»' && A.get(8).notes.length === 7 && near(A.duration(8), 4 * 60 / 140), 'Короткая фраза малой сексты');
     assert(A.get(7).notes.length === 16 && near(A.duration(7), 13.5 * 60 / 140), 'Полная фраза квинты');
     assert(A.get(7).notes.every(([, beats]) => [1, 3, 6].some(n => near(beats / .3, n))), 'Нет соотношения длительностей 6:3:1');
     assert(A.bpm === 140 && Object.isFrozen(A.melodies) && Object.isFrozen(A.get(1).notes) && Object.isFrozen(A.get(1).notes[0]), 'Словарь изменяем');
