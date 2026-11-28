@@ -331,6 +331,19 @@
       }
     } finally { f.close(); }
   });
+  await test('№8: без серой полосы и лишнего пробела; статистика сразу под карточкой', async () => {
+    const f = await fixture();
+    try {
+      for (const [width, height] of [[432, 934], [393, 852]]) {
+        f.frame.style.width = width + 'px'; f.frame.style.height = height + 'px';
+        assert(!f.d.querySelector('.progress'), 'Осталась серая полоса: ' + width);
+        const card = f.d.querySelector('.card').getBoundingClientRect(), metrics = f.d.querySelector('.metrics').getBoundingClientRect();
+        assert(metrics.top - card.bottom <= 12, 'Статистика далеко от карточки: ' + width);
+        assert(f.$('feedback').getBoundingClientRect().height === 0 && f.$('explanation').getBoundingClientRect().height === 0, 'Пустые блоки занимают место: ' + width);
+        assert(f.d.documentElement.scrollHeight === f.d.documentElement.clientHeight, 'Статистика ушла на следующий экран: ' + width);
+      }
+    } finally { f.close(); }
+  });
   window.__intervalAssociationResults = results;
   document.getElementById('results').textContent = results.map(r =>
     (r.ok ? 'OK ' : 'ОШИБКА ') + r.name + (r.error ? ': ' + r.error : '')
