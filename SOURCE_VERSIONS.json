@@ -55,6 +55,26 @@
       "original": "new reusable interval mnemonic dictionary and player",
       "sha256_original": null,
       "sha256_packaged": "fba378ebf915e5b9df582a5d5047283f1787c97a17fabab938c4714a2272f6a3"
+    },
+    "intervals-tonal.html": {
+      "original": "new exercise 9 based on the intervals-all.html shell",
+      "sha256_original": null,
+      "sha256_packaged": "7fca7a817c90af7492ce8b235c263df1480e95c4b09fecbd9afd1c5b5e7d0cb7"
+    },
+    "tonal-engine.js": {
+      "original": "new pure tonal-interval engine for exercise 9",
+      "sha256_original": null,
+      "sha256_packaged": "b039149d4dfdf1baf21e9b214c37b6e6e506bc5c34042db5e89c92a232d44012"
+    },
+    "tonal-exercise.js": {
+      "original": "new audio/UI controller for exercise 9",
+      "sha256_original": null,
+      "sha256_packaged": "76ed583b7c08f2790b8a24e9412b0f2fb875feb23272bf22c89dd134913c8223"
+    },
+    "interval-audio-data.js": {
+      "original": "piano samples extracted verbatim from intervals-all.html for exercise 9",
+      "sha256_original": null,
+      "sha256_packaged": "9ab4cd544be62b2d97ea08972681b0054f5506160f698e7e1bf9d1cc68b71fad"
     }
   }
 }

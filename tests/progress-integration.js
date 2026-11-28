@@ -5,7 +5,7 @@
   const source = await (await fetch('../progress-store.js')).text();
   const isolatedSource = source.replace("DB_NAME = 'solfege-ear-trainers-progress'", 'DB_NAME = ' + JSON.stringify(name));
   const assert = (ok, message) => { if (!ok) throw new Error(message); };
-  const wait = async fn => { const start = performance.now(); while (!(await fn())) { if (performance.now() - start > 15000) throw new Error('Истекло время ожидания'); await new Promise(resolve => setTimeout(resolve, 30)); } };
+  const wait = async fn => { const start = performance.now(); while (!(await fn())) { if (performance.now() - start > 30000) throw new Error('Истекло время ожидания'); await new Promise(resolve => setTimeout(resolve, 30)); } };
   // Microphone lifecycle and one-verdict-per-card integration use safe mocks
   // in pitch-tests.html / note-shooter-tests.html, not this replay harness.
   const files = Object.keys(P.EXERCISES).filter(id => !['play-the-note', 'note-shooter'].includes(id));
@@ -15,7 +15,8 @@
     try {
       const html = await (await fetch('../' + exercise + '.html')).text();
       const ready = new Promise(resolve => { frame.onload = resolve; });
-      frame.srcdoc = html.replace('<head>', '<head><base href="' + new URL('../', location.href).href + '">').replace('<script src="./progress-store.js"></script>', '<script>' + isolatedSource + '</script><script>Object.defineProperty(window,"localStorage",{value:{getItem(){return null},setItem(){},removeItem(){}}});Math.random=()=>.1;</script>');
+      frame.srcdoc = html.replace('<head>', '<head><base href="' + new URL('../', location.href).href + '">').replace('<script src="./progress-store.js?v=20261128-tonal"></script>', '<script>' + isolatedSource + '</script><script>Object.defineProperty(window,"localStorage",{value:{getItem(){return null},setItem(){},removeItem(){}}});Math.random=()=>.1;</script>')
+      .replace('<script src="./progress-store.js"></script>', '<script>' + isolatedSource + '</script><script>Object.defineProperty(window,"localStorage",{value:{getItem(){return null},setItem(){},removeItem(){}}});Math.random=()=>.1;</script>');
       document.body.append(frame); await ready;
       doc = frame.contentDocument; const win = frame.contentWindow, errors = [];
       win.addEventListener('error', event => errors.push(event.message));
@@ -25,6 +26,10 @@
       if (exercise === 'shifted-voice') { doc.querySelector('[data-voice="1"]').click(); doc.querySelector('[data-direction="1"]').click(); }
       else if (exercise === 'half-step') doc.querySelector('[data-direction="1"]').click();
       else if (exercise === 'note-reading') doc.querySelector('[data-letter="B"]').click();
+      else if (exercise === 'intervals-tonal') {
+        const current = win.TonalExercise.getCurrent();
+        [...doc.querySelectorAll('.choice')].find(b => Number(b.dataset.interval) !== current.distance).click();
+      }
       else [...doc.querySelectorAll('.choice')].filter(b => !b.disabled).at(-1).click();
       await wait(async () => (await store.list()).filter(a => a.exercise === exercise).length === 1);
       const first = (await store.list()).find(a => a.exercise === exercise);

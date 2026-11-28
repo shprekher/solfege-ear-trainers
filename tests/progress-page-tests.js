@@ -11,7 +11,9 @@
   }
   await store.importJSON(JSON.stringify({ app: 'solfege-ear-trainers', formatVersion: 1, answers: records }));
   const moduleSource = (await (await fetch('../progress-store.js')).text()).replace("DB_NAME = 'solfege-ear-trainers-progress'", 'DB_NAME = ' + JSON.stringify(name));
-  const html = (await (await fetch('../progress.html')).text()).replace('<head>', '<head><base href="' + new URL('../', location.href).href + '">').replace('<script src="./progress-store.js" defer></script>', '<script>' + moduleSource + '</script>');
+  const html = (await (await fetch('../progress.html', { cache: 'no-store' })).text()).replace('<head>', '<head><base href="' + new URL('../', location.href).href + '">')
+      .replace('<script src="./progress-store.js?v=20261128-tonal" defer></script>', '<script>' + moduleSource + '</script>')
+      .replace('<script src="./progress-store.js" defer></script>', '<script>' + moduleSource + '</script>');
   for (const width of [432, 393]) {
     const frame = document.createElement('iframe'); frame.style.cssText = 'width:' + width + 'px;height:934px;border:0';
     const loaded = new Promise(resolve => { frame.onload = resolve; }); frame.srcdoc = html; document.body.append(frame); await loaded;

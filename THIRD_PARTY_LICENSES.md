@@ -2,7 +2,7 @@
 
 Нотная аркада `note-shooter.html` не воспроизводит звуки и не содержит сторонних сэмплов, спрайтов или библиотек. Корабль и эффекты нарисованы для проекта средствами SVG. Лицензии и встроенные сэмплы сохранённых упражнений и прототипа не изменены.
 
-В сохранённых HTML-тренажёрах и прототипе `play-the-note.html` встроены сэмплы акустического пианино, полученные из SoundFont **TimGM6mb** (авторы Tim Brechbill и David Bolton), обозначенного в исходных файлах как **GNU GPL version 2**.
+В сохранённых HTML-тренажёрах и прототипе `play-the-note.html` встроены сэмплы акустического пианино, полученные из SoundFont **TimGM6mb** (авторы Tim Brechbill и David Bolton), обозначенного в исходных файлах как **GNU GPL version 2**. Файл `interval-audio-data.js` для упражнения 9 содержит те же сэмплы TimGM6mb, извлечённые из `intervals-all.html`; действует та же лицензия GPL-2.0.
 
 - Источник: https://www.timbrechbill.com/soundfonts/
 - GNU GPL v2: https://www.gnu.org/licenses/old-licenses/gpl-2.0.html

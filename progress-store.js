@@ -12,7 +12,8 @@
     'intervals-extended': '6 · Кварта, квинта и сексты',
     'play-the-note': '7 · Сыграй ноту',
     'note-shooter': '7 · Сыграй ноту — аркада',
-    'intervals-all': '8 · Все интервалы'
+    'intervals-all': '8 · Все интервалы',
+    'intervals-tonal': '9 · Интервалы в тональности'
   });
   const own = (o, key) => Object.prototype.hasOwnProperty.call(o, key);
   const dayKey = (date = new Date()) => [date.getFullYear(), String(date.getMonth() + 1).padStart(2, '0'), String(date.getDate()).padStart(2, '0')].join('-');
@@ -35,11 +36,11 @@
       throw new Error('Некорректная дата ответа. Импорт отменён.');
     }
     const mode = {};
-    const allowed = ['timbre', 'voices', 'clef', 'language', 'direction', 'intervalType'];
+    const allowed = ['timbre', 'voices', 'clef', 'language', 'direction', 'intervalType', 'level', 'answer', 'type'];
     const entries = Object.entries(value.mode);
     if (!entries.length || entries.length > allowed.length) throw new Error('Некорректный режим задания.');
     for (const [key, val] of entries) {
-      if (!allowed.includes(key) || !(text(val, 40) || (Number.isInteger(val) && val >= 1 && val <= 4))) throw new Error('Некорректный режим задания.');
+      if (!allowed.includes(key) || !(text(val, 40) || (Number.isInteger(val) && val >= 1 && val <= 7))) throw new Error('Некорректный режим задания.');
       mode[key] = val;
     }
     return { id: value.id, sessionId: value.sessionId, exercise: value.exercise, at: value.at, day: value.day,

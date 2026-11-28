@@ -6,6 +6,7 @@
   const percent = rows => rows.length ? Math.round(rows.filter(a => a.correct).length / rows.length * 100) + '%' : '—';
   function status(text, error = false) { $('status').textContent = text; $('status').classList.toggle('error', error); }
   function modeLabel(mode, exercise) {
+    if (exercise === 'intervals-tonal') return tonalModeLabel(mode);
     if (exercise === 'note-shooter') return (mode.clef === 'both' ? 'Оба ключа' : mode.clef === 'bass' ? 'Басовый ключ' : 'Скрипичный ключ') + ' · ' + mode.direction;
     if (exercise === 'play-the-note') return mode.direction;
     const parts = [];
@@ -17,15 +18,28 @@
     if (mode.timbre) parts.push(mode.timbre === 'piano' ? 'Пианино' : 'Электронное');
     return parts.join(' · ');
   }
+  function tonalModeLabel(mode) {
+    const parts = [];
+    if (mode.level) parts.push('Уровень ' + mode.level);
+    if (mode.direction) parts.push({ up: 'Вверх', down: 'Вниз', together: 'Вместе' }[mode.direction] || mode.direction);
+    if (mode.answer) parts.push({ buttons: 'Кнопки', midi: 'MIDI', voice: 'Голос' }[mode.answer] || mode.answer);
+    if (mode.type) parts.push(mode.type === 'tonic' ? 'От тоники' : 'Между ступенями');
+    return parts.join(' · ');
+  }
   function taskLabel(answer) {
     if (answer.exercise === 'note-shooter') return 'Сыграть: ' + answer.expected;
     if (answer.exercise === 'play-the-note') return 'Сыграть: ' + answer.expected;
     if (answer.exercise === 'half-step') return answer.task === 'up' ? 'Второй звук выше' : 'Второй звук ниже';
     if (answer.exercise === 'count-notes') return answer.expected + ' ноты';
     if (answer.exercise === 'shifted-voice') return answer.expected;
+    if (answer.exercise === 'intervals-tonal') {
+      const [distance, direction] = answer.task.split(':');
+      const name = { 1: 'Малая секунда', 2: 'Большая секунда', 3: 'Малая терция', 4: 'Большая терция', 5: 'Чистая кварта', 6: 'Тритон', 7: 'Чистая квинта', 8: 'Малая секста', 9: 'Большая секста', 10: 'Малая септима', 11: 'Большая септима', 12: 'Чистая октава' }[distance] || answer.expected;
+      return name + (direction === 'up' ? ' ↑' : direction === 'down' ? ' ↓' : ' · одновременно') + (answer.mode?.type === 'between' ? ' · между ступенями' : '');
+    }
     if (answer.exercise === 'intervals' || answer.exercise === 'intervals-extended' || answer.exercise === 'intervals-all') {
       const [distance, direction] = answer.task.split(':');
-      const name = { 1: 'Малая секунда', 2: 'Большая секунда', 3: 'Малая терция', 4: 'Большая терция', 5: 'Чистая кварта', 7: 'Чистая квинта', 8: 'Малая секста', 9: 'Большая секста', 10: 'Малая септима', 11: 'Большая септима' }[distance] || answer.expected;
+      const name = { 1: 'Малая секунда', 2: 'Большая секунда', 3: 'Малая терция', 4: 'Большая терция', 5: 'Чистая кварта', 6: 'Тритон', 7: 'Чистая квинта', 8: 'Малая секста', 9: 'Большая секста', 10: 'Малая септима', 11: 'Большая септима', 12: 'Чистая октава' }[distance] || answer.expected;
       return name + (direction === 'up' ? ' ↑' : direction === 'down' ? ' ↓' : ' · одновременно');
     }
     const [note, language] = answer.task.split(':');
@@ -136,7 +150,7 @@
   }));
   $('delete').addEventListener('click', () => action(async () => {
     if (!confirm('Удалить всю историю тренировок в этом браузере? Это действие нельзя отменить. Сначала можно экспортировать JSON.')) return;
-    await P.store.clear(); try { localStorage.removeItem('intervals-record'); localStorage.removeItem('intervals-extended-record'); localStorage.removeItem('intervals-all-record'); } catch {}
+    await P.store.clear(); try { for (const key of ['intervals-record', 'intervals-extended-record', 'intervals-all-record', 'intervals-tonal-record', 'intervals-tonal-adaptive', 'intervals-tonal-levels', 'intervals-tonal-intro']) localStorage.removeItem(key); } catch {}
     await reload(); status('Локальная история удалена. Новые ответы будут записываться заново.');
   }));
   window.addEventListener('pageshow', event => { if (event.persisted) action(reload); });
