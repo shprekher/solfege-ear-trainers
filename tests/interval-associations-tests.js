@@ -12,7 +12,7 @@
     1: [[0, 1], [1, .5], [0, 1], [1, .5]],
     2: [[0, 1.5], [2, .5], [3, 1.5], [0, .5]],
     3: [[0, .5], [3, .5], [7, .5], [3, .5], [5, 1.5]],
-    4: [[0, .5], [4, .5], [4, .5], [4, .5], [2, .25]],
+    4: [[0, .5], [4, .5], [5, 1.5], [9, .5], [12, 2]],
     5: [[0, .35], [5, .7], [0, .5], [2, .2], [4, .7]],
     6: [[0, .75], [6, .75], [7, 1.5]],
     7: [[0, 1.8], [7, 1.8], [5, .3], [4, .3], [2, .3]],
@@ -22,21 +22,23 @@
     11: [[0, 4], [11, 4], [12, 4]],
     12: [[0, 1], [12, 1], [11, .5], [7, .25], [9, .25]]
   };
-  await test('Словарь: все 12 фрагментов, паузы и ритм; отдельные темпы Катюши, RHCP и a-ha', () => {
+  await test('Словарь: все 12 фрагментов, паузы, ритм и заданные темпы', () => {
     for (const [distance, expected] of Object.entries(phrases)) {
       const melody = A.get(distance);
       assert(JSON.stringify(melody.notes) === JSON.stringify(expected), 'Ноты и ритм: ' + distance);
       assert(melody.notes.every(([offset, beats]) => (offset === null || Number.isInteger(offset)) && beats > 0), 'Формат: ' + distance);
-      assert(melody.bpm === ({2: 112, 10: 88, 11: 169}[distance] || 140), 'Темп мелодии: ' + distance);
+      const tempos = {1: 54, 2: 96, 3: 66, 4: 72, 5: 76, 6: 140, 7: 100, 8: 91, 9: 120, 10: 88, 11: 169, 12: 140};
+      assert(melody.bpm === tempos[distance], 'Темп мелодии: ' + distance);
       assert(near(A.duration(distance), expected.reduce((sum, [, beats]) => sum + beats * 60 / melody.bpm, 0)), 'Расчёт длительности');
       const pitched = melody.notes.filter(([offset]) => offset !== null);
       assert(pitched.length >= 3 && pitched.length <= 5, 'Нужно не больше пяти звучащих нот: ' + distance);
-      const limit = Number(distance) === 11 ? 4.5 : 2.2;
+      const limit = 4.4;
       assert(A.duration(distance) > .8 && A.duration(distance) < limit, 'Длина фрагмента: ' + distance);
     }
     assert(A.get(10).name === "RHCP — «Can't Stop»" && A.get(11).name === 'a-ha — «Take On Me»', 'Обновлённые названия');
-    assert(A.get(8).name === '«Прекрасное далёко»' && A.get(8).notes.length === 5 && near(A.duration(8), 2.5 * 60 / 140), 'Короткая фраза малой сексты');
-    assert(A.get(7).notes.length === 5 && near(A.duration(7), 4.5 * 60 / 140), 'Короткая фраза квинты');
+    assert(A.get(4).name === 'Louis Armstrong — «What a Wonderful World»', 'Название большой терции');
+    assert(A.get(8).name === '«Прекрасное далёко»' && A.get(8).notes.length === 5 && near(A.duration(8), 2.5 * 60 / 91), 'Короткая фраза малой сексты');
+    assert(A.get(7).notes.length === 5 && near(A.duration(7), 4.5 * 60 / 100), 'Короткая фраза квинты');
     assert(A.get(7).notes.every(([, beats]) => [1, 3, 6].some(n => near(beats / .3, n))), 'Нет соотношения длительностей 6:3:1');
     assert(A.bpm === 140 && Object.isFrozen(A.melodies) && Object.isFrozen(A.get(1).notes) && Object.isFrozen(A.get(1).notes[0]), 'Словарь изменяем');
   });
@@ -80,15 +82,28 @@
     });
     assert(near(calls[0].length, .25 * 60 / 88 * .65), 'Длительность звучания RHCP');
   });
-  await test('Катюша: четыре ноты «Расцветали», два пунктирных оборота и учебный темп 112 BPM', () => {
+  await test('Катюша: четыре ноты «Расцветали», два пунктирных оборота и учебный темп 96 BPM', () => {
     const calls = [], player = A.createPlayer((midi, start, length) => {
       calls.push({ midi, start, length }); return { stop() {} };
     });
     player.play(2, 60, 0);
     const onsets = [0, 1.5, 2, 3.5];
-    assert(calls.length === 4 && near(A.duration(2), 4 * 60 / 112), 'Длина фразы Катюши');
-    calls.forEach((n, i) => assert(near(n.start, onsets[i] * 60 / 112), 'Сетка Катюши'));
+    assert(calls.length === 4 && near(A.duration(2), 4 * 60 / 96), 'Длина фразы Катюши');
+    calls.forEach((n, i) => assert(near(n.start, onsets[i] * 60 / 96), 'Сетка Катюши'));
     assert(near(calls[0].length, 3 * calls[1].length) && near(calls[2].length, 3 * calls[3].length), 'Пунктирный ритм 3:1');
+  });
+  await test('What a Wonderful World: большая терция F→A, пять нот и точный ритм', () => {
+    const calls = [], player = A.createPlayer((midi, start, length) => {
+      calls.push({ midi, start, length }); return { stop() {} };
+    });
+    player.play(4, 60, 0);
+    const onsets = [0, .5, 1, 2.5, 3], pitches = [0, 4, 5, 9, 12];
+    assert(calls.length === 5 && near(A.duration(4), 5 * 60 / 72), 'Длина фразы');
+    calls.forEach((n, i) => {
+      assert(n.midi === 60 + pitches[i] && near(n.start, onsets[i] * 60 / 72), 'Сетка и высоты');
+    });
+    assert(near(calls[0].length, .5 * 60 / 72) && near(calls[2].length, 1.5 * 60 / 72) && near(calls[4].length, 2 * 60 / 72), 'Длительности');
+    assert(calls[1].midi - calls[0].midi === 4, 'Первые две ноты — не большая терция');
   });
   await test('Модуль: повтор отменяет прежний фрагмент; исключение останавливает уже созданные звуки', () => {
     const calls = [], player = A.createPlayer(() => {
