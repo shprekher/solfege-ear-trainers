@@ -317,6 +317,20 @@
       }
     } finally { f.close(); }
   });
+  await test('№8: переключатели в одну строку, слева тип, справа тембр, на телефонах', async () => {
+    const f = await fixture();
+    try {
+      for (const [width, height] of [[432, 934], [393, 852]]) {
+        f.frame.style.width = width + 'px'; f.frame.style.height = height + 'px';
+        const row = f.d.querySelector('.mode-row'), groups = [...f.d.querySelectorAll('.mode-switch')], buttons = [...f.d.querySelectorAll('.mode-btn')];
+        const rr = row.getBoundingClientRect(), left = groups[0].getBoundingClientRect(), right = groups[1].getBoundingClientRect();
+        assert(rr.height < 55, 'Переключатели переносятся на вторую строку: ' + width);
+        assert(Math.abs(left.left - rr.left) < 1 && Math.abs(right.right - rr.right) < 1, 'Группы не прижаты к краям: ' + width);
+        assert(buttons.every(b => b.getBoundingClientRect().height <= 40), 'Кнопки слишком высокие: ' + width);
+        assert(f.d.documentElement.scrollWidth === width, 'Горизонтальная прокрутка: ' + width);
+      }
+    } finally { f.close(); }
+  });
   window.__intervalAssociationResults = results;
   document.getElementById('results').textContent = results.map(r =>
     (r.ok ? 'OK ' : 'ОШИБКА ') + r.name + (r.error ? ': ' + r.error : '')
