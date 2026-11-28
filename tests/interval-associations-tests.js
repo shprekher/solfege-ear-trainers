@@ -337,6 +337,9 @@
       for (const [width, height] of [[432, 934], [393, 852]]) {
         f.frame.style.width = width + 'px'; f.frame.style.height = height + 'px';
         assert(!f.d.querySelector('.progress'), 'Осталась серая полоса: ' + width);
+        assert(!f.d.querySelector('.sub'), 'Осталась подпись под названием: ' + width);
+        const titleStyle = f.w.getComputedStyle(f.d.querySelector('h1')), buttonStyle = f.w.getComputedStyle(f.d.querySelector('.choice'));
+        assert(titleStyle.fontSize === buttonStyle.fontSize && titleStyle.fontWeight === buttonStyle.fontWeight, 'Шрифт заголовка не как у кнопок: ' + width);
         const card = f.d.querySelector('.card').getBoundingClientRect(), metrics = f.d.querySelector('.metrics').getBoundingClientRect();
         assert(metrics.top - card.bottom <= 12, 'Статистика далеко от карточки: ' + width);
         assert(f.$('feedback').getBoundingClientRect().height === 0 && f.$('explanation').getBoundingClientRect().height === 0, 'Пустые блоки занимают место: ' + width);

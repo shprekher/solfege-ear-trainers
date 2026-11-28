@@ -49,7 +49,7 @@
     "intervals-all.html": {
       "original": "new exercise based on intervals.html and intervals-extended.html",
       "sha256_original": null,
-      "sha256_packaged": "dbe8a6848a213357cbbdd6908bfe5ea315a72b6a7bf6e73b9b07b3384fa3b57a"
+      "sha256_packaged": "ecdd74c2a3b4e89957edb65922de7dcfe516f7e5c5abbd83643c87a80d4899b0"
     },
     "interval-associations.js": {
       "original": "new reusable interval mnemonic dictionary and player",
